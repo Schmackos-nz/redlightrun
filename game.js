@@ -15,6 +15,18 @@ function readSeed() {
   const m = /[?&]seed=(-?\d+)/.exec(location.search);
   return m ? (parseInt(m[1], 10) >>> 0) : DEFAULT_SEED;
 }
+/* ?debug=N drops you N metres into the course to test late content. The world
+   is still generated exactly as a normal run would be, so what you land in is
+   the real thing - but the run is flagged practice and never scores. */
+function readDebugStart() {
+  if (typeof location === 'undefined' || !location.search) return 0;
+  const m = /[?&]debug=([0-9]+)/.exec(location.search);
+  if (!m) return 0;
+  /* inline bounds: this runs at load time, above where clamp is declared */
+  return Math.max(0, Math.min(50000, parseInt(m[1], 10) || 0));
+}
+const DEBUG_START_M = readDebugStart();
+
 let WORLD_SEED = readSeed();
 let wstate = WORLD_SEED;
 function worldRand() {                                   // mulberry32
@@ -366,12 +378,19 @@ function flyer(x, y, amp, w) {
   W.enemies.push({ type: 'flyer', x, y, w: 30, h: 26, baseY: y, amp,
     minX: x - w, maxX: x + w, vx: chance(0.5) ? -80 : 80, t: rnd(0, 6) });
 }
-function turret(x, surfY, mode) {
+/* Bullets travel at 364px/s against a 330px/s runner, so they close at 694 and
+   a shot visible 400px out gives ~0.58s to react. They used to close at 850. */
+const BULLET_SPEED = 364;
+const TURRET_RATE = 1.4;
+/* Two turrets closer than this put their shots on top of each other. */
+const TURRET_MIN_GAP = 210;
+
+function turret(x, surfY, mode, phase) {
   // high = shoots over a crouching player, low = must be jumped
   if (x < SAFE_X) return;
   const my = mode === 'high' ? surfY - 34 : surfY - 14;
   W.enemies.push({ type: 'turret', x: x - 17, y: my - 20, w: 34, h: 40,
-    my, sy: surfY, mode, cd: rnd(0.2, 1.2), rate: 1.0, dir: -1 });
+    my, sy: surfY, mode, cd: phase, rate: TURRET_RATE, dir: -1 });
 }
 function slasher(x, surfY) {
   if (x < SAFE_X) return;
@@ -477,15 +496,28 @@ function segCrouch(x, y, d) {
 }
 
 function segTurrets(x, y, d) {
-  const w = rnd(430, 660);
+  const w = rnd(560, 900);
   addGround(x, y, w);
-  const n = 1 + ri(0, 1) + (d > 0.55 ? 1 : 0);
+
+  /* One mode per hall. A high shot wants a duck and a low shot wants a jump;
+     mixing them side by side can demand both in the same instant, which is not
+     dodgeable however slow the bullets are. */
+  const mode = chance(0.55) ? 'high' : 'low';
+
+  const usable = w - 300;                                // 150 lead-in, 150 run-out
+  const cap = Math.max(1, Math.floor(usable / TURRET_MIN_GAP) + 1);
+  const n = Math.min(cap, 1 + ri(0, 1) + (d > 0.6 ? 1 : 0));
   for (let i = 0; i < n; i++) {
-    const tx = x + 150 + (w - 230) * ((i + 0.5) / n);
-    turret(tx, y, chance(0.55) ? 'high' : 'low');
+    const tx = x + 150 + (n === 1 ? usable * 0.5 : usable * (i / (n - 1)));
+    /* Stagger the volleys so they interleave rather than land together. Phases
+       stay above the 0.35 offscreen grace so entering the view cannot reset
+       them into unison. */
+    turret(tx, y, mode, 0.4 + (i / n) * TURRET_RATE);
   }
+
+  /* cover to duck behind, kept clear of the muzzles */
   for (let i = 0; i < 2; i++) {
-    if (chance(0.65)) addSolid(x + rnd(90, w - 150), y - 62, 26, 62, 'block');
+    if (chance(0.6)) addSolid(x + rnd(80, w - 190), y - 62, 26, 62, 'block');
   }
   return { w, y };
 }
@@ -669,6 +701,54 @@ function generateSeeded() {
   W.n++;
 }
 
+/* Teleport to `metres` into the already-generated course, landing somewhere
+   safe. Called after the normal opening generation so SAFE_X and the seed have
+   already done their work and the layout is bit-identical to a real run. */
+function startAtMetres(metres) {
+  const targetX = S.startX + metres * PPM;
+  let guard = 0;
+  while (W.genX < targetX + 2600 && guard++ < 40000) generate();
+
+  let seg = null;
+  for (const sg of W.segs) if (sg.x1 > targetX) { seg = sg; break; }
+  if (!seg) return;
+
+  /* walk forward from the segment start until the spawn box stands on solid
+     ground and is clear of spikes and anything alive */
+  let px = seg.x0 + 24, surfY = null;
+  for (let tries = 0; tries < 80; tries++, px += 24) {
+    let top = null;
+    for (const s of W.solids) {
+      if (s.oneWay || s.kind === 'slab') continue;
+      if (px < s.x || px + PW > s.x + s.w) continue;
+      if (top === null || s.y < top) top = s.y;
+    }
+    if (top === null) continue;
+    const box = { x: px, y: top - PH, w: PW, h: PH };
+    let clear = true;
+    for (const sp of W.spikes) if (aabb(box, sp)) { clear = false; break; }
+    if (clear) for (const e of W.enemies) {
+      if (e.type !== 'turret' && aabb(box, e)) { clear = false; break; }
+    }
+    if (clear) { surfY = top; break; }
+  }
+  if (surfY === null) return;
+
+  P.x = px; P.y = surfY - PH; P.h = PH; P.crouch = false;
+  P.vx = 0; P.vy = 0; P.onGround = true; P.jumps = 0; P.trail.length = 0;
+  S.maxX = P.x;
+  S.dist = Math.max(0, Math.floor((P.x - S.startX) / PPM));
+  S.practice = true;
+  $('dist').textContent = S.dist;
+  storm.x = P.x - 1020;
+  W.bullets.length = 0; W.parts.length = 0;
+  cam.x = P.x + P.w / 2 - viewW * 0.38;
+  cam.y = P.y + P.h / 2 - viewH * 0.60;
+  cam.sx = cam.x; cam.sy = cam.y;
+  prune(P.x - 1400);
+  while (W.genX < P.x + 2600) generate();
+}
+
 function prune(minX) {
   const keep = o => o.x + (o.w || 0) > minX;
   W.solids  = W.solids.filter(keep);
@@ -720,12 +800,16 @@ function startRun() {
   S.mode = 'play'; S.startX = P.x; S.dist = 0; S.maxX = P.x; S.t = 0;
   S.shake = 0; S.cause = ''; S.deadT = 0; S.litState = 'none'; S.lbl = null;
   S.canRetry = false;
+  S.practice = false;
   jumpPressed = false;                                   // drop any stale buffered press
   $('zone').textContent = '';
   storm.x = P.x - 760; storm.v = 55; storm.flash = 0;
   cam.x = P.x - viewW * 0.36; cam.y = P.y - viewH * 0.55;
 
   while (W.genX < P.x + 2600) generate();
+
+  if (DEBUG_START_M > 0) startAtMetres(DEBUG_START_M);
+  $('practice').classList.toggle('hidden', !S.practice);
 
   musicStart();
 
@@ -774,10 +858,14 @@ function showDeath() {
   $('dCause').textContent = S.cause;
   $('dScore').textContent = sc;
   $('dBest').textContent  = 'BEST ' + Math.max(prevBest, 0) + ' M';
-  $('newRec').style.display = (sc > prevBest && sc > 0) ? 'block' : 'none';
+  /* A practice run started partway into the course never touches the board. */
+  $('dScoreLbl').textContent = S.practice ? 'METRES · PRACTICE RUN, NOT SAVED' : 'METRES';
+  $('dScoreLbl').style.color = S.practice ? '#ffc043' : '';
+  $('newRec').style.display = (!S.practice && sc > prevBest && sc > 0) ? 'block' : 'none';
 
   const list = loadScores();
-  const qualifies = sc > 0 && (list.length < 10 || sc > list[list.length - 1].s);
+  const qualifies = !S.practice && sc > 0 &&
+                    (list.length < 10 || sc > list[list.length - 1].s);
   pendingScore = -1;
   if (qualifies) {
     $('nameRow').style.display = 'flex';
@@ -935,6 +1023,12 @@ function hazards(dt) {
         if (aabb(P, blade)) return die('CUT DOWN');
       }
       if (aabb(P, e)) return die('CUT DOWN');
+    } else if (e.type === 'turret') {
+      /* The chassis is scenery. A high shot has to pass through a standing
+         player's box, so the muzzle is unavoidably in the running lane - if the
+         body killed too, every turret would have to be jumped WHILE dodging its
+         own fire. The bullets are the threat; you run straight past the gun. */
+      continue;
     } else if (aabb(P, e)) {
       return die(e.type === 'flyer' ? 'SWARMED' : 'SOMETHING GOT YOU');
     }
@@ -974,7 +1068,7 @@ function updateEntities(dt) {
       e.cd -= dt;
       if (e.cd <= 0 && P.x < e.x + 40 && P.x > e.x - 1000) {
         e.cd = e.rate;
-        W.bullets.push({ x: e.x - 4, y: e.my, vx: -520, vy: 0, r: 6, life: 3.2, t: 0 });
+        W.bullets.push({ x: e.x - 4, y: e.my, vx: -BULLET_SPEED, vy: 0, r: 6, life: 4.6, t: 0 });
         sfx.shoot();
         part(e.x - 8, e.my, -180, rnd(-40, 40), 0.2, '#ffcf6b', 3);
       }

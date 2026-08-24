@@ -100,6 +100,13 @@ and shift the layout when a frame is dropped.
 - `index.html` - markup, styling, menus, HUD
 - `game.js` - everything else
 
+Append `?debug=N` to start N metres into the course to test late content. The
+world is generated exactly as a normal run would generate it, so what you land
+in is the real thing, and the spawn walks forward until it finds solid ground
+clear of spikes and enemies. **A `?debug=` run is flagged practice and never
+touches the high score board** - the HUD shows a PRACTICE badge and the death
+screen says NOT SAVED.
+
 Append `?dev` to the URL to expose `window.__RLR` (world, player, state, and a
 `startRun` / `update` / `render` / `generate` handle) for driving the sim by hand.
 
@@ -114,6 +121,28 @@ Measured from the real physics, not assumed:
 Generation is capped against those numbers: obstacles never exceed 210px, pits
 never exceed 260px, shaft rungs rise 100px, and crouch doorways always leave
 between 26 and 45px so they need a crouch but are never impassable.
+
+### Turret halls
+
+A high shot passes over a crouching player; a low shot has to be hopped. Three
+rules keep them dodgeable:
+
+- **One mode per hall.** Mixing high and low side by side can demand a duck and a
+  jump in the same instant, which is not dodgeable at any bullet speed.
+- **210px minimum spacing**, so shots arrive one at a time rather than stacked.
+- **Staggered volleys**, phased above the 0.35s offscreen grace so entering the
+  view cannot reset them into unison.
+
+Bullets travel 364px/s against a 330px/s runner, closing at 694, so a shot
+visible 400px out gives ~0.58s to react. Measured across 36 halls: minimum gap
+between arrivals in a *low* hall is 0.625s, comfortably above the 0.40s a crouch
+hop costs. High halls can bunch tighter, which is fine - a duck is instant and
+can simply be held.
+
+The turret chassis does **not** kill on contact. A high shot has to pass through
+a standing player's box, so the muzzle is unavoidably in the running lane; if the
+body killed too, every turret would have to be jumped *while* dodging its own
+fire.
 
 ### The unjumpable band
 
