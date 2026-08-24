@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>REDLIGHT RUN</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;overflow:hidden;background:#05060d;
+    font-family:"Segoe UI",Inter,system-ui,sans-serif;color:#dfe6ff;
+    -webkit-user-select:none;user-select:none;touch-action:none}
+  #wrap{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%}
+
+  .layer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;pointer-events:none;overflow:auto;padding:20px 0}
+  .layer.on{pointer-events:auto}
+  .hidden{display:none!important}
+
+  /* ---------- HUD ---------- */
+  #hud{position:absolute;inset:0;pointer-events:none;padding:14px 18px;
+    display:flex;flex-direction:column;gap:6px}
+  #hudTop{display:flex;justify-content:space-between;align-items:flex-start}
+  .stat{font-variant-numeric:tabular-nums;letter-spacing:.06em}
+  #dist{font-size:34px;font-weight:800;text-shadow:0 0 18px rgba(120,180,255,.55);line-height:1}
+  #distLbl{font-size:11px;opacity:.5;letter-spacing:.28em;margin-top:3px}
+  #best{font-size:13px;opacity:.55;text-align:right;letter-spacing:.14em}
+  #zone{font-size:12px;opacity:.45;text-align:right;letter-spacing:.2em;margin-top:6px}
+
+  #lightBox{position:absolute;left:50%;top:16px;transform:translateX(-50%);
+    display:none;align-items:center;gap:12px;padding:10px 18px;border-radius:999px;
+    background:rgba(6,8,18,.72);border:1px solid rgba(255,255,255,.12);
+    box-shadow:0 8px 30px rgba(0,0,0,.5)}
+  #lightBox.on{display:flex}
+  #lamp{width:22px;height:22px;border-radius:50%;background:#2b3140}
+  #lightTxt{font-size:12px;letter-spacing:.26em;font-weight:700;opacity:.85}
+
+  /* ---------- Panels ---------- */
+  .panel{background:linear-gradient(160deg,rgba(16,20,38,.94),rgba(8,10,22,.96));
+    border:1px solid rgba(140,170,255,.18);border-radius:18px;padding:30px 34px;
+    box-shadow:0 30px 80px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.06);
+    max-width:min(94vw,720px);width:100%;text-align:center}
+  .title{font-size:clamp(34px,7vw,64px);font-weight:900;letter-spacing:.06em;line-height:.95}
+  .title .r{color:#ff5566;text-shadow:0 0 26px rgba(255,60,80,.6)}
+  .title .g{color:#4dffa0;text-shadow:0 0 26px rgba(60,255,150,.5)}
+  .sub{margin-top:10px;font-size:13px;opacity:.6;letter-spacing:.2em}
+
+  .keys{margin:22px auto 4px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:10px;text-align:left;max-width:600px}
+  .key{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+    border-radius:10px;padding:9px 12px;font-size:12.5px;opacity:.85;display:flex;gap:9px;align-items:center}
+  .kb{display:inline-block;min-width:24px;text-align:center;padding:2px 6px;border-radius:5px;
+    background:rgba(150,180,255,.14);border:1px solid rgba(150,180,255,.22);
+    font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+
+  .rules{margin-top:16px;font-size:12.5px;line-height:1.75;opacity:.62;max-width:560px;
+    margin-left:auto;margin-right:auto;text-align:left}
+  .rules b{color:#ff6b7d;font-weight:700}
+  .rules i{color:#4dffa0;font-style:normal;font-weight:700}
+
+  .btn{margin-top:24px;pointer-events:auto;cursor:pointer;border:0;
+    font:inherit;font-weight:800;letter-spacing:.16em;font-size:14px;
+    padding:14px 34px;border-radius:12px;color:#040a14;
+    background:linear-gradient(180deg,#79e0ff,#3aa8ff);
+    box-shadow:0 10px 30px rgba(60,150,255,.35);transition:transform .1s,box-shadow .1s}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(60,150,255,.5)}
+  .btn:active{transform:translateY(1px)}
+  .btn.ghost{background:transparent;color:#9fb4e6;border:1px solid rgba(160,190,255,.28);
+    box-shadow:none;margin-left:10px}
+  .btn.ghost:hover{background:rgba(160,190,255,.08)}
+
+  /* ---------- Death ---------- */
+  #dTitle{font-size:clamp(28px,6vw,48px);font-weight:900;letter-spacing:.08em;color:#ff6070;
+    text-shadow:0 0 30px rgba(255,60,80,.55)}
+  #dCause{margin-top:8px;font-size:13px;letter-spacing:.2em;opacity:.6}
+  #dScore{margin-top:22px;font-size:clamp(46px,10vw,78px);font-weight:900;line-height:1;
+    font-variant-numeric:tabular-nums;text-shadow:0 0 30px rgba(120,180,255,.45)}
+  #dScoreLbl{font-size:11px;letter-spacing:.3em;opacity:.45;margin-top:4px}
+  #dBest{margin-top:14px;font-size:13px;opacity:.6;letter-spacing:.12em}
+  #newRec{display:none;margin-top:14px;color:#ffd166;font-weight:800;letter-spacing:.2em;
+    font-size:13px;animation:pulse 1s infinite alternate}
+  @keyframes pulse{from{opacity:.55}to{opacity:1}}
+  #nameRow{display:none;margin-top:16px;gap:10px;align-items:center;justify-content:center}
+  #nameIn{width:130px;text-align:center;text-transform:uppercase;letter-spacing:.35em;
+    font:inherit;font-weight:800;font-size:18px;padding:9px 6px;border-radius:10px;
+    color:#eaf1ff;background:rgba(255,255,255,.06);border:1px solid rgba(160,190,255,.3);outline:none}
+  #nameIn:focus{border-color:#79e0ff;box-shadow:0 0 0 3px rgba(120,220,255,.15)}
+
+  /* ---------- Scores ---------- */
+  .scores{margin-top:22px;width:100%;max-width:420px;margin-left:auto;margin-right:auto}
+  .scores h3{font-size:11px;letter-spacing:.3em;opacity:.45;font-weight:700;margin-bottom:10px}
+  .row{display:flex;align-items:center;gap:10px;padding:6px 12px;border-radius:8px;
+    font-size:13px;font-variant-numeric:tabular-nums}
+  .row:nth-child(odd){background:rgba(255,255,255,.035)}
+  .row.me{background:rgba(255,209,102,.14);box-shadow:inset 0 0 0 1px rgba(255,209,102,.3)}
+  .row .rk{width:26px;opacity:.45;font-weight:700}
+  .row .nm{flex:1;text-align:left;letter-spacing:.2em;font-weight:700;opacity:.9}
+  .row .sc{font-weight:800}
+  .empty{font-size:12px;opacity:.35;padding:10px}
+
+  /* ---------- Touch ---------- */
+  #touch{position:absolute;inset:0;display:none;pointer-events:none}
+  #touch.on{display:block}
+  .tb{position:absolute;pointer-events:auto;border-radius:50%;
+    background:rgba(180,205,255,.1);border:1px solid rgba(180,205,255,.22);
+    display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;
+    color:rgba(230,240,255,.65)}
+  .tb.act{background:rgba(120,200,255,.3)}
+  #tL{left:20px;bottom:26px;width:78px;height:78px}
+  #tR{left:112px;bottom:26px;width:78px;height:78px}
+  #tJ{right:20px;bottom:26px;width:92px;height:92px}
+  #tC{right:126px;bottom:30px;width:74px;height:74px}
+
+  #fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;
+    transition:opacity .18s}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="hudTop">
+      <div>
+        <div id="dist" class="stat">0</div>
+        <div id="distLbl">METRES</div>
+      </div>
+      <div>
+        <div id="best" class="stat">BEST 0</div>
+        <div id="zone"></div>
+      </div>
+    </div>
+    <div id="lightBox"><div id="lamp"></div><div id="lightTxt">WATCHING</div></div>
+  </div>
+
+  <div id="menu" class="layer on">
+    <div class="panel">
+      <div class="title"><span class="r">REDLIGHT</span> <span class="g">RUN</span></div>
+      <div class="sub">RUN FAR &middot; FREEZE WHEN IT IS RED</div>
+      <div class="keys">
+        <div class="key"><span class="kb">A</span><span class="kb">D</span> move</div>
+        <div class="key"><span class="kb">SPACE</span> jump, tap twice to double jump</div>
+        <div class="key"><span class="kb">S</span> crouch to slide under</div>
+        <div class="key"><span class="kb">R</span> restart &middot; <span class="kb">M</span> mute</div>
+      </div>
+      <div class="rules">
+        &#9679; Spikes, bullets and anything alive kill you <b>instantly</b>.<br>
+        &#9679; Miss a jump in a shaft and you fall onto the spikes below.<br>
+        &#9679; Inside a watcher's zone: move on <i>GREEN</i>, freeze on <b>RED</b>.<br>
+        &#9679; The storm eats the world behind you. Keep going.
+      </div>
+      <button class="btn" id="playBtn">START RUN</button>
+      <div id="scores" class="scores"></div>
+    </div>
+  </div>
+
+  <div id="death" class="layer hidden">
+    <div class="panel">
+      <div id="dTitle">YOU DIED</div>
+      <div id="dCause">SPIKES</div>
+      <div id="dScore">0</div>
+      <div id="dScoreLbl">METRES</div>
+      <div id="dBest">BEST 0 M</div>
+      <div id="newRec">&#9733; NEW PERSONAL BEST &#9733;</div>
+      <div id="nameRow"><input id="nameIn" maxlength="3" placeholder="AAA" autocomplete="off"><button class="btn" id="saveBtn" style="margin-top:0">SAVE</button></div>
+      <div>
+        <button class="btn" id="againBtn">RUN AGAIN</button>
+        <button class="btn ghost" id="menuBtn">MENU</button>
+      </div>
+      <div id="dScores" class="scores"></div>
+    </div>
+  </div>
+
+  <div id="touch">
+    <div class="tb" id="tL">&#9664;</div>
+    <div class="tb" id="tR">&#9654;</div>
+    <div class="tb" id="tC">&#9660;</div>
+    <div class="tb" id="tJ">&#9650;</div>
+  </div>
+
+  <div id="fade"></div>
+</div>
+<script>if (location.search.indexOf("dev") >= 0) window.__RLR_DEBUG = true;</script>
+<script src="game.js"></script>
+</body>
+</html>
