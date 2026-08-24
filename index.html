@@ -45,13 +45,20 @@
   .title .g{color:#4dffa0;text-shadow:0 0 26px rgba(60,255,150,.5)}
   .sub{margin-top:10px;font-size:13px;opacity:.6;letter-spacing:.2em}
 
-  .keys{margin:22px auto 4px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
-    gap:10px;text-align:left;max-width:600px}
-  .key{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
-    border-radius:10px;padding:9px 12px;font-size:12.5px;opacity:.85;display:flex;gap:9px;align-items:center}
-  .kb{display:inline-block;min-width:24px;text-align:center;padding:2px 6px;border-radius:5px;
+  .keys{margin:24px auto 6px;display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(min(282px,100%),1fr));
+    gap:2px 24px;text-align:left;max-width:620px}
+  .krow{display:grid;grid-template-columns:max-content 1fr;gap:11px;
+    align-items:baseline;padding:6px 2px;border-radius:8px}
+  .krow:hover{background:rgba(255,255,255,.03)}
+  /* caps never shrink and never wrap; the fixed width lines the labels up */
+  .kcaps{display:flex;gap:4px;flex:0 0 auto;min-width:94px;white-space:nowrap}
+  .klbl{font-size:12.5px;line-height:1.4;opacity:.72;min-width:0;overflow-wrap:break-word}
+  .klbl em{font-style:normal;opacity:.62}
+  .kb{display:inline-block;min-width:23px;text-align:center;padding:3px 6px;border-radius:5px;
     background:rgba(150,180,255,.14);border:1px solid rgba(150,180,255,.22);
-    font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+    font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap;line-height:1.1}
+  .kplus{opacity:.4;font-size:11px;align-self:center}
 
   .rules{margin-top:16px;font-size:12.5px;line-height:1.75;opacity:.62;max-width:560px;
     margin-left:auto;margin-right:auto;text-align:left}
@@ -113,6 +120,16 @@
 
   #fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;
     transition:opacity .18s}
+
+  @media (max-width:520px){
+    .panel{padding:22px 16px;border-radius:14px}
+    .keys{gap:0 14px;max-width:100%}
+    .kcaps{min-width:82px}
+    .klbl{font-size:12px}
+    .rules{font-size:12px;line-height:1.7}
+    .btn{padding:13px 24px;font-size:13px}
+    .btn.ghost{margin-left:6px}
+  }
 </style>
 </head>
 <body>
@@ -138,10 +155,30 @@
       <div class="title"><span class="r">REDLIGHT</span> <span class="g">RUN</span></div>
       <div class="sub">SAME COURSE EVERY RUN &middot; LEARN IT &middot; BEAT IT</div>
       <div class="keys">
-        <div class="key"><span class="kb">A</span><span class="kb">D</span> move</div>
-        <div class="key"><span class="kb">SPACE</span> jump, tap twice to double jump</div>
-        <div class="key"><span class="kb">S</span> crouch &middot; <span class="kb">S</span>+<span class="kb">SPACE</span> low hop</div>
-        <div class="key"><span class="kb">R</span> restart &middot; <span class="kb">M</span> mute</div>
+        <div class="krow">
+          <span class="kcaps"><span class="kb">A</span><span class="kb">D</span></span>
+          <span class="klbl">Move <em>&mdash; or arrows</em></span>
+        </div>
+        <div class="krow">
+          <span class="kcaps"><span class="kb">SPACE</span></span>
+          <span class="klbl">Jump <em>&mdash; twice to double jump</em></span>
+        </div>
+        <div class="krow">
+          <span class="kcaps"><span class="kb">S</span></span>
+          <span class="klbl">Crouch <em>&mdash; slide under</em></span>
+        </div>
+        <div class="krow">
+          <span class="kcaps"><span class="kb">S</span><span class="kplus">+</span><span class="kb">SPACE</span></span>
+          <span class="klbl">Low hop <em>&mdash; tight ceilings</em></span>
+        </div>
+        <div class="krow">
+          <span class="kcaps"><span class="kb">SPACE</span></span>
+          <span class="klbl">Run again <em>&mdash; after dying</em></span>
+        </div>
+        <div class="krow">
+          <span class="kcaps"><span class="kb">R</span><span class="kb">M</span></span>
+          <span class="klbl">Restart <em>&middot;</em> mute</span>
+        </div>
       </div>
       <div class="rules">
         &#9679; Spikes, bullets and anything alive kill you <b>instantly</b>.<br>
