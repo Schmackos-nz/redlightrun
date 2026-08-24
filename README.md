@@ -3,6 +3,11 @@
 An infinite side-scrolling platformer for the browser. Run as far as you can;
 the score is the distance. No build step - open `index.html`.
 
+**The course is fixed.** Every run lays out the same world, so a longer run means
+you played better, not that you drew an easier level, and the high-score table is
+a fair comparison. Add `?seed=12345` to the URL for a different (but equally
+fixed) course.
+
 ## Controls
 
 | Key | Action |
@@ -34,7 +39,15 @@ flat breather inserted after most hard segments:
 `up` / `down` (vertical shafts over spike floors) `red` (watcher zone)
 `fly` `slsh` (bladeworks) `gaunt` (spike teeth)
 
-Difficulty ramps over the first 11,000px, then holds.
+Difficulty ramps over the first 11,000px, then holds. It is derived from the
+**generation cursor**, not the player position - otherwise a segment would get a
+different difficulty depending on where the player happened to be standing when
+it streamed in, and the course would drift between runs.
+
+Generation draws from a seeded mulberry32 stream (`worldRand`). `rngSrc` is
+swapped to it for the duration of `generate()` only, so cosmetic randomness
+(particles, sparks, screen shake, star twinkle) can never consume world entropy
+and shift the layout when a frame is dropped.
 
 ## Layout
 

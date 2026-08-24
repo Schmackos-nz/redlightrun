@@ -5,10 +5,30 @@
 (function () {
 
 /* ------------------------------ utils ---------------------------------- */
-const rnd   = (a, b) => a + Math.random() * (b - a);
-const ri    = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
+/* The course is fixed. Level generation draws from a seeded stream so every run
+   lays out an identical world; cosmetic randomness (particles, sparks, screen
+   shake) stays on Math.random so a dropped frame can never shift the level.
+   rngSrc is swapped to the seeded stream for the duration of generate() only. */
+const DEFAULT_SEED = 0x5EED1A7E;
+function readSeed() {
+  if (typeof location === 'undefined' || !location.search) return DEFAULT_SEED;
+  const m = /[?&]seed=(-?\d+)/.exec(location.search);
+  return m ? (parseInt(m[1], 10) >>> 0) : DEFAULT_SEED;
+}
+let WORLD_SEED = readSeed();
+let wstate = WORLD_SEED;
+function worldRand() {                                   // mulberry32
+  wstate = (wstate + 0x6D2B79F5) | 0;
+  let t = Math.imul(wstate ^ (wstate >>> 15), 1 | wstate);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+let rngSrc = Math.random;
+const rnd   = (a, b) => a + rngSrc() * (b - a);
+const ri    = (a, b) => Math.floor(a + rngSrc() * (b - a + 1));
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-const chance = p => Math.random() < p;
+const chance = p => rngSrc() < p;
 const aabb  = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 function hash(n) { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); }
 
@@ -182,7 +202,7 @@ function walker(x, surfY, minX, maxX) {
 function flyer(x, y, amp, w) {
   if (x < SAFE_X) return;
   W.enemies.push({ type: 'flyer', x, y, w: 30, h: 26, baseY: y, amp,
-    minX: x - w, maxX: x + w, vx: chance(0.5) ? -80 : 80, t: Math.random() * 6 });
+    minX: x - w, maxX: x + w, vx: chance(0.5) ? -80 : 80, t: rnd(0, 6) });
 }
 function turret(x, surfY, mode) {
   // high = shoots over a crouching player, low = must be jumped
@@ -194,7 +214,7 @@ function turret(x, surfY, mode) {
 function slasher(x, surfY) {
   if (x < SAFE_X) return;
   W.enemies.push({ type: 'slasher', x: x - 16, y: surfY - 44, w: 32, h: 44,
-    t: Math.random() * 2.2, reach: 76 });
+    t: rnd(0, 2.2), reach: 76 });
 }
 
 /* ---- segment generators: f(x, surfaceY, difficulty) -> {w, y} ---------- */
@@ -341,7 +361,7 @@ function segRedlight(x, y, d) {
     t: 0, state: 'green',
     tGreen: Math.max(1.15, 2.9 - 1.3 * d),
     tWarn: Math.max(0.4, 0.72 - 0.2 * d),
-    tRed: 1.1 + Math.random() * 1.1 + 0.7 * d,
+    tRed: 1.1 + rnd(0, 1.1) + 0.7 * d,
     eyeX: x + w - 46, eyeY: y - 168, blink: 0, surfY: y
   });
   return { w, y };
@@ -408,10 +428,19 @@ const SEG_LABEL = {
   fly: 'SWARM', slsh: 'BLADEWORKS', gaunt: 'THE TEETH'
 };
 
-function difficulty() { return clamp((P.x - S.startX) / 11000, 0, 1); }
+/* Difficulty of a segment is a property of WHERE it sits in the course, not of
+   where the player was standing when it happened to stream in. */
+function genDifficulty() { return clamp((W.genX - S.startX) / 11000, 0, 1); }
+/* How far the player has actually got - drives the storm, never the layout. */
+function runDifficulty() { return clamp((P.x - S.startX) / 11000, 0, 1); }
 
 function generate() {
-  const d = difficulty();
+  rngSrc = worldRand;
+  try { generateSeeded(); } finally { rngSrc = Math.random; }
+}
+
+function generateSeeded() {
+  const d = genDifficulty();
   let entry;
   if (W.n < 3) {
     entry = POOL[W.n === 1 ? 1 : 0];
@@ -424,7 +453,7 @@ function generate() {
       if (p.id === W.lastType) v *= 0.15;
       tot += v; return v;
     });
-    let r = Math.random() * tot;
+    let r = rngSrc() * tot;
     entry = POOL[POOL.length - 1];
     for (let i = 0; i < POOL.length; i++) { r -= ws[i]; if (r <= 0) { entry = POOL[i]; break; } }
   }
@@ -474,6 +503,7 @@ function startRun() {
   audioInit();
   W.solids = []; W.spikes = []; W.enemies = []; W.bullets = []; W.zones = []; W.parts = [];
   W.backs = []; W.segs = []; W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
+  wstate = WORLD_SEED;                                   // rewind the course
 
   addGround(-600, 0, 700);                                // safe launch pad
   W.segs.push({ x0: -600, x1: 100, killY: 980, id: 'flat' });
@@ -845,7 +875,7 @@ function update(dt) {
   P.trail = P.trail.filter(g => g.life > 0);
 
   /* storm */
-  const d = difficulty();
+  const d = runDifficulty();
   storm.v = 58 + 118 * d;
   if (!redFreeze) storm.x += storm.v * dt;
   if (P.x - storm.x > 1020) storm.x = P.x - 1020;
@@ -1375,6 +1405,8 @@ function bootScene() {
 bootScene();
 if (typeof window !== 'undefined' && window.__RLR_DEBUG) {
   window.__RLR = { W, P, S, cam, storm, K, startRun, update, render, generate,
+    setSeed: n => { WORLD_SEED = n >>> 0; wstate = WORLD_SEED; },
+    getSeed: () => WORLD_SEED,
     press: () => { jumpPressed = true; jumpHeld = true; },
     release: () => { jumpHeld = false; },
     frozen: () => redFreeze, cause: () => S.cause };
