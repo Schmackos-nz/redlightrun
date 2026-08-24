@@ -294,7 +294,8 @@ const sfx = {
   warn:  () => tone(400, 0.09, 'square', 0.13),
   red:   () => { tone(300, 0.22, 'sawtooth', 0.16, 150); noise(0.2, 0.08, 500); },
   die:   () => { tone(180, 0.5, 'sawtooth', 0.28, 40); noise(0.5, 0.22, 900); },
-  mark:  () => tone(1050, 0.09, 'sine', 0.10, 1400)
+  mark:  () => tone(1050, 0.09, 'sine', 0.10, 1400),
+  lob:   () => { tone(150, 0.16, 'sine', 0.16, 320); noise(0.1, 0.07, 600); }
 };
 
 /* ------------------------------ input ---------------------------------- */
@@ -508,6 +509,32 @@ function fireBarrel(e, which) {
   W.bullets.push({ x: bx, y: by, vx, vy, r: 6, life: 4.6, t: 0, aim: which });
   part(bx, by, vx * -0.35, vy * -0.35 + rnd(-30, 30), 0.2, '#ffcf6b', 3);
 }
+/* A mortar bolted to a shaft wall. It lobs an arcing shell at wherever you are
+   standing, and will not fire again until that shell has landed or expired, so
+   there is never more than one in the air per gun. */
+const LOB_G = 1500;          // gentler than player gravity: a lazy, readable arc
+const LOB_CHARGE = 0.55;     // telegraph before it lets go
+
+function lobber(x, y, dir) {
+  if (x < SAFE_X) return;
+  W.enemies.push({ type: 'lobber', x, y, w: 30, h: 26, dir,
+    cd: rnd(0.3, 1.1), rest: 0.6, busy: false, charge: 0, t: 0 });
+}
+
+function fireLob(e) {
+  const sx = e.x + e.w / 2 + e.dir * 16, sy = e.y + 4;
+  const tx = P.x + P.w / 2, ty = P.y + P.h;              // where you are standing
+  const dist = Math.hypot(tx - sx, ty - sy);
+  const T = clamp(dist / 300, 0.75, 2.1);                // flight time
+  W.bullets.push({
+    x: sx, y: sy, r: 8, t: 0, aim: 'lob',
+    vx: (tx - sx) / T,
+    vy: (ty - sy) / T - 0.5 * LOB_G * T,
+    grav: LOB_G, life: T + 1.8, owner: e, tx, ty
+  });
+  part(sx, sy, e.dir * 60, -120, 0.3, '#ffd08a', 4);
+}
+
 function slasher(x, surfY) {
   if (x < SAFE_X) return;
   W.enemies.push({ type: 'slasher', x: x - 16, y: surfY - 44, w: 32, h: 44,
@@ -680,6 +707,11 @@ function segShaftUp(x, y, d) {
       addSpikes(right ? x + 40 : x + SW - 58, ly - 70, 18, right ? 'right' : 'left');
   }
   if (d > 0.5 && chance(0.45)) flyer(x + SW * 0.5, y - rise * (steps * 0.5), 46, 90);
+  if (d > LOBBER_D && chance(0.5)) {
+    const i = 1 + ri(0, Math.max(0, steps - 2));
+    if (chance(0.5)) lobber(x + 40, y - rise * i - 30, 1);
+    else lobber(x + SW - 70, y - rise * i - 30, -1);
+  }
   return { w: SW, y: topY };
 }
 
@@ -776,7 +808,7 @@ function segGauntlet(x, y, d) {
    single jump. Missing one drops you back onto the entry floor rather than
    killing you: the cost is the climb, not the run. Moving and crumbling rungs
    are mixed in as the course goes on. */
-const MOVER_D = 0.45, CRUMBLE_D = 0.62;
+const MOVER_D = 0.45, CRUMBLE_D = 0.62, LOBBER_D = 0.50;
 
 function segClimb(x, y, d) {
   const w = 430, WALL = 40;
@@ -806,6 +838,19 @@ function segClimb(x, y, d) {
     else addLedge(lx, ly, lw);
     side = !side;
   }
+  /* Mortars bolted to the shaft walls, from 275m. One per tower at first, two
+     later; never on the bottom or top rung so there is a clean start and finish. */
+  if (d > LOBBER_D) {
+    const many = d > 0.72 && chance(0.45);
+    for (let k = 0; k < (many ? 2 : 1); k++) {
+      if (!chance(0.75)) continue;
+      const i = 2 + ri(0, Math.max(0, steps - 4));
+      const ly = y - rise * i - 30;
+      if (chance(0.5)) lobber(x + WALL, ly, 1);
+      else lobber(x + w - WALL - 30, ly, -1);
+    }
+  }
+
   /* last rung sits against the exit wall so you can step off the top */
   addLedge(x + w - WALL - 130, topY, 130);
   return { w, y: topY };
@@ -1319,6 +1364,20 @@ function updateEntities(dt) {
         e.barrel = (e.barrel + 1) % 3;
         sfx.shoot();
       }
+    } else if (e.type === 'lobber') {
+      e.t += dt;
+      if (!e.busy) {
+        const dx = (P.x + P.w / 2) - (e.x + e.w / 2);
+        const dy = (P.y + P.h) - e.y;
+        const inRange = Math.abs(dx) < 620 && dy > -820 && dy < 520;
+        if (inRange) {
+          e.cd -= dt;
+          if (e.cd <= 0) {
+            e.charge += dt;
+            if (e.charge >= LOB_CHARGE) { fireLob(e); e.charge = 0; e.busy = true; sfx.lob(); }
+          }
+        } else { e.charge = 0; }
+      }
     } else if (e.type === 'slasher') {
       e.t += dt;
       const cyc = 2.15;
@@ -1331,15 +1390,27 @@ function updateEntities(dt) {
   /* bullets */
   for (const b of W.bullets) {
     b.life -= dt; b.t += dt;
+    if (b.grav) b.vy += b.grav * dt;
     b.x += b.vx * dt; b.y += b.vy * dt;
     if (b.life <= 0) continue;
     for (const s of W.solids) {
-      if (s.oneWay) continue;
+      /* a lobbed shell lands on ledges too - they are ground as far as it cares */
+      if (s.oneWay && !(b.grav && b.vy > 0)) continue;
+      if (!solidOn(s)) continue;
       if (b.x > s.x && b.x < s.x + s.w && b.y > s.y && b.y < s.y + s.h) {
-        b.life = 0; burst(b.x, b.y, 5, '#ffb457', 130, 0.28); break;
+        b.life = 0;
+        burst(b.x, b.y, b.grav ? 12 : 5, '#ffb457', b.grav ? 210 : 130, b.grav ? 0.4 : 0.28);
+        if (b.grav) noise(0.18, 0.12, 900);
+        break;
       }
     }
-    if (b.life > 0 && chance(0.6)) part(b.x, b.y, rnd(-20, 20), rnd(-20, 20), 0.18, '#ffae4d', 2);
+    if (b.life > 0 && chance(b.grav ? 0.9 : 0.6))
+      part(b.x, b.y, rnd(-20, 20), rnd(-20, 20), b.grav ? 0.3 : 0.18, '#ffae4d', b.grav ? 3 : 2);
+  }
+  /* a spent shell frees its gun to reload */
+  for (const b of W.bullets) {
+    if (b.life > 0 || !b.owner) continue;
+    b.owner.busy = false; b.owner.cd = b.owner.rest; b.owner = null;
   }
   W.bullets = W.bullets.filter(b => b.life > 0);
 
@@ -1751,6 +1822,32 @@ function drawEnemy(e) {
     /* charge bar */
     ctx.fillStyle = 'rgba(255,170,60,.18)'; ctx.fillRect(e.x + 6, e.y + e.h - 9, e.w - 12, 4);
     ctx.fillStyle = 'rgba(255,190,90,.95)'; ctx.fillRect(e.x + 6, e.y + e.h - 9, (e.w - 12) * chg, 4);
+  } else if (e.type === 'lobber') {
+    const chg = clamp(e.charge / LOB_CHARGE, 0, 1);
+    ctx.fillStyle = '#1d2540';                           /* wall bracket */
+    ctx.fillRect(e.dir > 0 ? e.x - 8 : e.x + e.w, e.y + 4, 8, e.h - 8);
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,150,60,' + (0.2 + 0.5 * chg).toFixed(2) + ')';
+    ctx.shadowBlur = 6 + 16 * chg;
+    ctx.fillStyle = '#33406b';
+    ctx.fillRect(e.x, e.y, e.w, e.h);
+    ctx.restore();
+    ctx.fillStyle = '#5a6da8'; ctx.fillRect(e.x, e.y, e.w, 3);
+    ctx.save();                                          /* the tube, angled up */
+    ctx.translate(e.x + e.w / 2, e.y + 6);
+    ctx.rotate(e.dir > 0 ? -0.9 : 0.9);
+    ctx.fillStyle = '#3d4a78'; ctx.fillRect(-7, -22, 14, 26);
+    ctx.fillStyle = '#151a2b'; ctx.fillRect(-4, -22, 8, 12);
+    if (chg > 0.05) {
+      ctx.shadowColor = 'rgba(255,170,60,.95)'; ctx.shadowBlur = 4 + 14 * chg;
+      ctx.fillStyle = 'rgb(255,' + Math.round(110 + 110 * chg) + ',60)';
+      ctx.fillRect(-4, -24, 8, 5);
+    }
+    ctx.restore();
+    if (e.busy) {                                        /* reloading */
+      ctx.fillStyle = 'rgba(120,150,220,.5)';
+      ctx.fillRect(e.x + 6, e.y + e.h - 7, e.w - 12, 3);
+    }
   } else if (e.type === 'slasher') {
     const tel = e.phase === 1, act = e.phase === 2;
     ctx.shadowColor = act ? 'rgba(120,240,255,.9)' : 'rgba(90,120,255,.35)';
@@ -2010,8 +2107,30 @@ function render() {
   /* bullets */
   ctx.save();
   ctx.shadowColor = 'rgba(255,180,80,.9)'; ctx.shadowBlur = 14;
+  /* where each shell is coming down */
+  for (const b of W.bullets) {
+    if (!b.grav || b.tx === undefined || b.tx > x1 || b.tx < x0) continue;
+    ctx.save();
+    const p2 = 0.5 + 0.5 * Math.sin(S.t * 11);
+    ctx.strokeStyle = 'rgba(255,150,70,' + (0.35 + 0.4 * p2).toFixed(2) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(b.tx, b.ty - 3, 17 + 4 * p2, 6 + 2 * p2, 0, 0, 7); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(b.tx - 7, b.ty - 17); ctx.lineTo(b.tx, b.ty - 8); ctx.lineTo(b.tx + 7, b.ty - 17);
+    ctx.stroke();
+    ctx.restore();
+  }
   for (const b of W.bullets) {
     if (b.x > x1 || b.x < x0 || b.y > y1 || b.y + 40 < y0) continue;
+    if (b.grav) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,150,60,.9)'; ctx.shadowBlur = 14;
+      ctx.translate(b.x, b.y); ctx.rotate(b.t * 7);
+      ctx.fillStyle = '#ffcf8a'; ctx.fillRect(-7, -5, 14, 10);
+      ctx.fillStyle = '#ff8a3d'; ctx.fillRect(-7, -5, 5, 10);
+      ctx.restore();
+      continue;
+    }
     const vert = b.vy !== 0;
     ctx.fillStyle = '#ffd48a';
     ctx.beginPath();

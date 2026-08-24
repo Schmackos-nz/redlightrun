@@ -86,6 +86,15 @@ flat breather inserted after most hard segments:
 `fly` `slsh` (bladeworks) `gaunt` (spike teeth) `climb` (the ascent)
 `holes` (the drop)
 
+### Mortars
+
+From 275m, some shaft and tower walls carry a **lobber**: a mortar that arcs a
+shell at wherever you are standing when it fires. It will not fire again until
+that shell has landed or expired, so a single gun never has two in the air. A
+pulsing ring marks where the shell is coming down, and the charge glow telegraphs
+the shot, so the 0.55s wind-up plus flight time is your window to move. Standing
+put gets you hit; walking off the marked spot does not.
+
 ### Verticality
 
 `climb` is a walled tower of 6-13 floating rungs zig-zagging upward, up to
