@@ -38,7 +38,13 @@ Append `?touch` to force the mobile scheme on a desktop for layout checks.
 - **Watcher zones** are red-light/green-light. Inside one, moving while the eye
   is red kills you. The amber phase is your warning to come to a complete stop -
   you slide for about a tenth of a second after releasing, so stop early.
-- A storm eats the world behind you. It pauses while a watcher holds you frozen.
+- **The wall does not advance on its own.** It winds up while you are not making
+  progress, and unwinds over 100 m of running. Standing still from a full 100 m
+  lead is fatal in about 13 s; running sheds the whole wind-up over 100 m.
+  Climbing counts as progress (net new height, so hopping on the spot does not),
+  and a red light freezes the wall along with you.
+- A chase bar at the top shows a 100 m span: a skull for the wall, an arrow for
+  you. It reddens and the skull pulses as it closes.
 - Score is distance in metres; the top ten runs are kept in `localStorage`.
 
 ## Music

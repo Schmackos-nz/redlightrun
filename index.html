@@ -34,7 +34,29 @@
     border-radius:999px;padding:4px 10px;display:inline-block}
   #zone{font-size:12px;opacity:.45;text-align:right;letter-spacing:.2em;margin-top:6px}
 
-  #lightBox{position:absolute;left:50%;top:16px;transform:translateX(-50%);
+  /* ---------- Chase indicator: a 100m span ---------- */
+  #chase{position:absolute;left:50%;top:12px;transform:translateX(-50%);
+    width:min(400px,62vw);pointer-events:none}
+  #chaseTrack{position:relative;height:12px;border-radius:999px;
+    background:rgba(8,11,22,.72);border:1px solid rgba(150,180,255,.22);
+    box-shadow:0 4px 18px rgba(0,0,0,.45);overflow:visible}
+  #chaseFill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;
+    background:linear-gradient(90deg,rgba(255,60,90,0),rgba(255,60,90,.75));width:0}
+  #chaseSkull{position:absolute;top:50%;left:0;transform:translate(-50%,-50%);
+    font-size:19px;line-height:1;filter:drop-shadow(0 0 7px rgba(255,60,90,.85))}
+  #chaseYou{position:absolute;top:50%;right:-1px;transform:translate(50%,-50%);
+    display:flex;flex-direction:column;align-items:center;gap:1px}
+  #chaseYou .ar{font-size:13px;line-height:1;color:#8fe6ff;
+    filter:drop-shadow(0 0 6px rgba(120,220,255,.8))}
+  #chaseYou .lb{font-size:8px;font-weight:800;letter-spacing:.16em;color:#8fe6ff;opacity:.9}
+  #chaseEnds{display:flex;justify-content:space-between;margin-top:3px;
+    font-size:8px;letter-spacing:.16em;opacity:.35;font-weight:700}
+  #chase.hot #chaseTrack{border-color:rgba(255,80,110,.6)}
+  #chase.hot #chaseSkull{animation:skullPulse .5s infinite alternate}
+  @keyframes skullPulse{from{transform:translate(-50%,-50%) scale(1)}
+                        to{transform:translate(-50%,-50%) scale(1.28)}}
+
+  #lightBox{position:absolute;left:50%;top:54px;transform:translateX(-50%);
     display:none;align-items:center;gap:12px;padding:10px 18px;border-radius:999px;
     background:rgba(6,8,18,.72);border:1px solid rgba(255,255,255,.12);
     box-shadow:0 8px 30px rgba(0,0,0,.5)}
@@ -179,6 +201,14 @@
         <div id="zone"></div>
       </div>
     </div>
+    <div id="chase">
+      <div id="chaseTrack">
+        <div id="chaseFill"></div>
+        <div id="chaseSkull">&#128128;</div>
+        <div id="chaseYou"><span class="ar">&#9660;</span><span class="lb">YOU</span></div>
+      </div>
+      <div id="chaseEnds"><span>100 M</span><span>0 M</span></div>
+    </div>
     <div id="lightBox"><div id="lamp"></div><div id="lightTxt">WATCHING</div></div>
   </div>
 
@@ -216,7 +246,7 @@
         &#9679; Spikes, bullets and anything alive kill you <b>instantly</b>.<br>
         &#9679; Miss a jump in a shaft and you fall onto the spikes below.<br>
         &#9679; Inside a watcher's zone: move on <i>GREEN</i>, freeze on <b>RED</b>.<br>
-        &#9679; The storm eats the world behind you. Keep going.<br>
+        &#9679; The wall only speeds up while you stall. Keep moving and it falls back.<br>
         &#9679; Under a low ceiling, crouch as you jump for a flatter hop.<br>
         &#9679; The course never changes, so every metre is a fair comparison.
       </div>

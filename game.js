@@ -45,6 +45,8 @@ const aabb  = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h &&
 function hash(n) { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); }
 
 const $ = id => document.getElementById(id);
+/* looked up once: the chase bar moves every frame */
+const chaseSkull = $('chaseSkull'), chaseFill = $('chaseFill');
 
 /* ------------------------------ tuning --------------------------------- */
 const PPM        = 20;      // pixels per "metre" of score
@@ -995,7 +997,13 @@ const S = { mode: 'menu', startX: 0, best: 0, dist: 0, maxX: 0, t: 0,
             shake: 0, cause: '', deadT: 0, litState: 'none' };
 
 const cam = { x: 0, y: 0, sx: 0, sy: 0 };
-const storm = { x: 0, v: 0, flash: 0 };
+/* The wall no longer advances on its own. It only gains speed while you are not
+   making progress, and that speed bleeds away again over 100m of running. The
+   trail matches the 100m the chase indicator shows. */
+const STORM_TRAIL = 100 * PPM;      // 2000px: the full span of the chase bar
+const BOOST_SHED  = 100 * PPM;      // 100m of progress sheds a full head of steam
+const STALL_GRACE = 0.8;            // pausing to line up a jump is not stalling
+const storm = { x: 0, v: 0, boost: 0, flash: 0 };
 
 function part(x, y, vx, vy, life, col, r) {
   if (W.parts.length > 420) return;
@@ -1032,7 +1040,8 @@ function startRun() {
   S.practice = false;
   jumpPressed = false;                                   // drop any stale buffered press
   $('zone').textContent = '';
-  storm.x = P.x - 760; storm.v = 55; storm.flash = 0;
+  storm.x = P.x - STORM_TRAIL; storm.v = 0; storm.boost = 0; storm.flash = 0;
+  S.stallT = 0; S.bestY = P.y;
   cam.x = P.x - viewW * 0.36; cam.y = P.y - viewH * 0.55;
 
   while (W.genX < P.x + 2600) generate();
@@ -1420,15 +1429,38 @@ function update(dt) {
   for (const g of P.trail) g.life -= dt;
   P.trail = P.trail.filter(g => g.life > 0);
 
-  /* storm */
+  /* ---- the wall -------------------------------------------------------
+     Standing still is what feeds it. Advancing your furthest point resets the
+     stall and sheds speed; climbing counts as progress too, or a tall tower
+     would be a death sentence. A red light freezes everything, since being
+     still there is the rule, not a choice. */
   const d = runDifficulty();
-  storm.v = 58 + 118 * d;
-  if (!redFreeze) storm.x += storm.v * dt;
-  if (P.x - storm.x > 1020) storm.x = P.x - 1020;
+  const boostMax = 200 + 90 * d;
+  const boostRamp = 70 + 60 * d;
+  const adv = P.x - S.maxX;                              // progress past your best
+  /* Climbing counts as progress, but only NET new height - the highest point
+     you have reached, the vertical twin of maxX. Accumulated ascent would let
+     you hop on the spot forever, and a per-frame delta quietly demands a
+     minimum climb rate that a slow steady ascent slips under. */
+  if (adv > 0.5) {
+    S.stallT = 0;
+    S.bestY = P.y;                                       // rebaseline height as you advance
+    storm.boost = Math.max(0, storm.boost - boostMax * (adv / BOOST_SHED));
+  } else if (P.y < S.bestY - 8) {
+    S.stallT = 0; S.bestY = P.y;                         // genuinely higher than before
+  } else if (!redFreeze) {
+    S.stallT += dt;
+  }
+  if (!redFreeze && S.stallT > STALL_GRACE)
+    storm.boost = Math.min(boostMax, storm.boost + boostRamp * dt);
 
-  /* Music tracks the wall. The gap is clamped at 1020, and the interesting
-     range is the last few hundred pixels, so map 800 -> calm and 140 -> panic
-     rather than spreading the curve over the whole slack. */
+  storm.v = storm.boost;
+  if (!redFreeze) storm.x += storm.v * dt;
+  if (P.x - storm.x > STORM_TRAIL) storm.x = P.x - STORM_TRAIL;
+
+  /* Music tracks the wall. The gap now runs to 2000px, but the interesting part
+     is still the last few hundred, so map 800 -> calm and 140 -> panic rather
+     than spreading the curve over the whole trail. */
   const gap = P.x - storm.x;
   const pr = clamp(1 - (gap - 140) / 660, 0, 1);
   MUS.inten = pr;
@@ -1452,9 +1484,19 @@ function update(dt) {
   /* HUD subtitle: what you are standing in, or how close the storm is */
   let lbl = '';
   for (const sg of W.segs) if (P.x + P.w > sg.x0 && P.x < sg.x1) { lbl = SEG_LABEL[sg.id] || ''; break; }
-  const stormGap = Math.floor((P.x - storm.x) / PPM);
-  if (stormGap < 14) lbl = 'STORM ' + Math.max(0, stormGap) + ' M';
-  if (lbl !== S.lbl) { S.lbl = lbl; $('zone').textContent = lbl; $('zone').style.color = stormGap < 14 ? '#ff6070' : ''; }
+  if (lbl !== S.lbl) { S.lbl = lbl; $('zone').textContent = lbl; }
+
+  /* ---- chase indicator: a 100m span, skull for the wall, arrow for you ---- */
+  const gapM = (P.x - storm.x) / PPM;
+  const frac = clamp(1 - gapM / 100, 0, 1);              // 0 = 100m back, 1 = on you
+  chaseSkull.style.left = (frac * 100).toFixed(2) + '%';
+  const heat = clamp((frac - 0.45) / 0.55, 0, 1);        // reddens as it closes
+  chaseFill.style.width = (frac * 100).toFixed(2) + '%';
+  chaseFill.style.opacity = (0.25 + 0.6 * heat).toFixed(2);
+  if (heat > 0.55 !== S.chaseHot) {
+    S.chaseHot = heat > 0.55;
+    $('chase').classList.toggle('hot', S.chaseHot);
+  }
 
   hazards(dt);
 
