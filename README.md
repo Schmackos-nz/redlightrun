@@ -31,6 +31,34 @@ Touch controls appear automatically on touch devices.
 - A storm eats the world behind you. It pauses while a watcher holds you frozen.
 - Score is distance in metres; the top ten runs are kept in `localStorage`.
 
+## Music
+
+Procedural, no assets. A 32-step (two bar) loop in A minor (i - VI - VII - v) is
+scheduled ahead of the audio clock, and **the storm wall drives it**. The gap to
+the wall is clamped at 1020px, and the interesting range is the last few hundred,
+so it maps 800px to calm and 140px to panic rather than spreading the curve over
+the whole slack:
+
+| gap | tempo | mix |
+| --- | --- | --- |
+| 800px+ | 88 bpm | kick and bass pulse, lowpass closed at 700Hz |
+| 550px | 129 bpm | hats come in |
+| 400px | 154 bpm | arpeggio, snare |
+| 140px or less | 196 bpm | sixteenth hats, alarm lead, lowpass wide at 5900Hz |
+
+Tempo glides toward its target rather than snapping, so a brief scare does not
+jerk the beat. Inside a watcher zone on red the melodic layers drop out entirely
+and only a slow heartbeat kick is left, so holding still feels as exposed as it
+should.
+
+Two things worth knowing if you touch this:
+
+- Audio is scheduled from the animation frame (`musicTick`), never from the fixed
+  physics step. The audio clock has nothing to do with the timestep.
+- The lowpass is retargeted from `musicTick` with a dead zone, not from `update`.
+  Driving an `AudioParam` at 120Hz piles up an automation event every 8ms and the
+  filter never actually travels.
+
 ## Level generation
 
 The world is streamed in segments about 2600px ahead of the player and pruned

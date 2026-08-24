@@ -81,6 +81,8 @@ resize();
 let actx = null, master = null;
 let muted = localStorage.getItem('rlr_mute') === '1';
 
+let musBus = null, musFilter = null, noiseBuf = null;
+
 function audioInit() {
   if (actx) return;
   try {
@@ -88,11 +90,32 @@ function audioInit() {
     master = actx.createGain();
     master.gain.value = muted ? 0 : 0.32;
     master.connect(actx.destination);
+
+    /* music sits on its own bus, under the sound effects, behind a lowpass
+       that opens up as the storm closes in */
+    musFilter = actx.createBiquadFilter();
+    musFilter.type = 'lowpass';
+    musFilter.frequency.value = 900;
+    musFilter.Q.value = 0.7;
+    musBus = actx.createGain();
+    musBus.gain.value = 0;
+    musFilter.connect(musBus);
+    musBus.connect(master);
+
+    /* one shared noise buffer for every hat and snare */
+    const len = Math.floor(actx.sampleRate * 0.5);
+    noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) nd[i] = Math.random() * 2 - 1;
   } catch (e) { actx = null; }
+}
+function audioResume() {
+  if (actx && actx.state === 'suspended') { try { actx.resume(); } catch (e) {} }
 }
 function setMute(m) {
   muted = m; localStorage.setItem('rlr_mute', m ? '1' : '0');
   if (master) master.gain.value = m ? 0 : 0.32;
+  if (!m) audioResume();
 }
 function tone(freq, dur, type, vol, slideTo) {
   if (!actx || muted) return;
@@ -115,6 +138,139 @@ function noise(dur, vol, freq) {
   const g = actx.createGain(); g.gain.value = vol == null ? 0.25 : vol;
   src.connect(f); f.connect(g); g.connect(master); src.start(t);
 }
+/* ======================= storm-driven music ============================
+   A 32-step (two bar) loop scheduled ahead of the audio clock. Tempo and
+   instrumentation are both driven by how close the storm wall is: far away it
+   is a slow bass pulse, right behind you it is a fast four-on-the-floor with
+   hats, arpeggio and an alarm on top. */
+const MUS = {
+  on: false, step: 0, nextTime: 0, bpm: 88, targetBpm: 88, inten: 0,
+  hush: false, lookahead: 0.14, cut: 700, cutSet: -1
+};
+const BPM_CALM = 88, BPM_PANIC = 196;
+
+/* i - VI - VII - v in A minor: eight 16th steps each */
+const PROG = [
+  { root: 110.00, tones: [220.00, 261.63, 329.63] },   // Am
+  { root:  87.31, tones: [174.61, 220.00, 261.63] },   // F
+  { root:  98.00, tones: [196.00, 246.94, 293.66] },   // G
+  { root:  82.41, tones: [164.81, 196.00, 246.94] }    // Em
+];
+
+function mvoice(freq, t, dur, type, vol, slideTo) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(musFilter);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function mkick(t, vol) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(155, t);
+  o.frequency.exponentialRampToValueAtTime(44, t + 0.11);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.17);
+  o.connect(g); g.connect(musBus);                     /* bypass the lowpass */
+  o.start(t); o.stop(t + 0.19);
+}
+function mperc(t, vol, hp, dur) {
+  const s = actx.createBufferSource(); s.buffer = noiseBuf;
+  s.playbackRate.value = 1 + Math.random() * 0.3;
+  const f = actx.createBiquadFilter();
+  f.type = 'highpass'; f.frequency.value = hp;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(musBus);
+  s.start(t); s.stop(t + dur + 0.02);
+}
+
+function scheduleStep(step, t) {
+  const k = MUS.inten;
+  const chord = PROG[(step >> 3) & 3];
+  const beat = step & 7;
+
+  /* During a red light the melodic layers drop out and only a heartbeat is
+     left, so holding still feels as exposed as it should. */
+  if (MUS.hush) {
+    if (beat === 0) mkick(t, 0.5);
+    return;
+  }
+
+  if (beat === 0 || beat === 4) mkick(t, 0.85);
+  else if (k > 0.45 && beat === 6) mkick(t, 0.5);
+
+  /* bass */
+  if (beat === 0 || beat === 3 || beat === 6)
+    mvoice(chord.root, t, 0.2 + 0.14 * (1 - k), 'square', 0.16);
+  if (k > 0.3 && beat === 6)
+    mvoice(chord.root * 0.5, t, 0.22, 'triangle', 0.12);
+
+  /* hats: eighths, then sixteenths when it gets close */
+  if (k > 0.16 && (step & 1) === 1) mperc(t, 0.05 + 0.05 * k, 7800, 0.045);
+  if (k > 0.62 && (step & 1) === 0 && beat !== 0) mperc(t, 0.035, 9500, 0.03);
+  if (k > 0.5 && beat === 4) mperc(t, 0.1, 1800, 0.13);   /* snare */
+
+  /* arpeggio */
+  if (k > 0.4 && (step & 1) === 0) {
+    const n = chord.tones[(step >> 1) % chord.tones.length];
+    mvoice(n, t, 0.1, 'triangle', 0.05 + 0.05 * k);
+  }
+  /* alarm on top when the wall is nearly on you */
+  if (k > 0.78 && beat === 0)
+    mvoice(chord.tones[2] * 2, t, 0.16, 'sawtooth', 0.045, chord.tones[2] * 2.4);
+}
+
+function musicStart() {
+  if (!actx) return;
+  audioResume();
+  MUS.on = true; MUS.step = 0; MUS.inten = 0;
+  MUS.bpm = MUS.targetBpm = BPM_CALM;
+  MUS.hush = false;
+  MUS.cut = 700; MUS.cutSet = -1;
+  musFilter.frequency.cancelScheduledValues(actx.currentTime);
+  musFilter.frequency.setValueAtTime(700, actx.currentTime);
+  MUS.nextTime = actx.currentTime + 0.08;
+  musBus.gain.cancelScheduledValues(actx.currentTime);
+  musBus.gain.setValueAtTime(0.0001, actx.currentTime);
+  musBus.gain.linearRampToValueAtTime(0.55, actx.currentTime + 0.7);
+}
+function musicStop() {
+  if (!actx || !MUS.on) return;
+  MUS.on = false;
+  const t = actx.currentTime;
+  musBus.gain.cancelScheduledValues(t);
+  musBus.gain.setValueAtTime(musBus.gain.value, t);
+  musBus.gain.linearRampToValueAtTime(0.0001, t + 0.45);
+}
+/* Called once per animation frame, not per physics step: audio is scheduled
+   against the audio clock, which has nothing to do with the fixed timestep. */
+function musicTick() {
+  if (!MUS.on || !actx || muted) return;
+  const now = actx.currentTime;
+  /* after a mute or a tab stall nextTime can be far in the past - do not try
+     to catch up, just re-anchor to now */
+  if (MUS.nextTime < now) MUS.nextTime = now + 0.03;
+  /* Ramp the lowpass here rather than from the physics step: at 120Hz that
+     piled up an automation event every 8ms and the filter never actually
+     travelled. Only retarget when it has drifted enough to matter. */
+  if (Math.abs(MUS.cut - MUS.cutSet) > 60) {
+    MUS.cutSet = MUS.cut;
+    musFilter.frequency.setTargetAtTime(MUS.cut, now, 0.15);
+  }
+  let guard = 0;
+  while (MUS.nextTime < now + MUS.lookahead && guard++ < 24) {
+    scheduleStep(MUS.step, MUS.nextTime);
+    MUS.nextTime += 60 / MUS.bpm / 4;                  /* 16th notes */
+    MUS.step = (MUS.step + 1) & 31;
+  }
+}
+
 const sfx = {
   jump:  () => tone(430, 0.13, 'square', 0.16, 780),
   dbl:   () => tone(660, 0.15, 'triangle', 0.16, 1120),
@@ -571,6 +727,8 @@ function startRun() {
 
   while (W.genX < P.x + 2600) generate();
 
+  musicStart();
+
   $('menu').classList.add('hidden');  $('menu').classList.remove('on');
   $('death').classList.add('hidden'); $('death').classList.remove('on');
   $('hud').classList.remove('hidden');
@@ -584,6 +742,7 @@ function die(cause) {
   if (!P.alive) return;
   P.alive = false; S.mode = 'dead'; S.cause = cause; S.deadT = 0; S.shake = 26;
   redFreeze = false;
+  musicStop();
   sfx.die();
   burst(P.x + P.w / 2, P.y + P.h / 2, 34, '#ff5a70', 460, 0.9);
   burst(P.x + P.w / 2, P.y + P.h / 2, 18, '#ffd166', 300, 0.7);
@@ -933,6 +1092,18 @@ function update(dt) {
   storm.v = 58 + 118 * d;
   if (!redFreeze) storm.x += storm.v * dt;
   if (P.x - storm.x > 1020) storm.x = P.x - 1020;
+
+  /* Music tracks the wall. The gap is clamped at 1020, and the interesting
+     range is the last few hundred pixels, so map 800 -> calm and 140 -> panic
+     rather than spreading the curve over the whole slack. */
+  const gap = P.x - storm.x;
+  const pr = clamp(1 - (gap - 140) / 660, 0, 1);
+  MUS.inten = pr;
+  MUS.hush = redFreeze;
+  MUS.targetBpm = BPM_CALM + (BPM_PANIC - BPM_CALM) * pr;
+  /* glide instead of snapping, so a brief scare does not jerk the tempo */
+  MUS.bpm += (MUS.targetBpm - MUS.bpm) * Math.min(1, dt * 3.2);
+  MUS.cut = 700 + 5200 * pr;                             // applied in musicTick
   storm.flash = Math.max(0, storm.flash - dt);
   if (chance(dt * 2.2)) storm.flash = 0.16;
 
@@ -1440,6 +1611,7 @@ function frame(now) {
   let guard = 0;
   while (acc >= STEP && guard++ < 8) { update(STEP); acc -= STEP; }
   if (guard >= 8) acc = 0;
+  musicTick();
   render();
 }
 
@@ -1458,7 +1630,12 @@ function bootScene() {
 }
 bootScene();
 if (typeof window !== 'undefined' && window.__RLR_DEBUG) {
-  window.__RLR = { W, P, S, cam, storm, K, startRun, update, render, generate,
+  window.__RLR = { W, P, S, cam, storm, K, MUS, startRun, update, render, generate,
+    music: () => ({ on: MUS.on, bpm: +MUS.bpm.toFixed(1), target: +MUS.targetBpm.toFixed(1),
+                    inten: +MUS.inten.toFixed(3), hush: MUS.hush, step: MUS.step,
+                    cutoff: musFilter ? Math.round(musFilter.frequency.value) : null,
+                    busGain: musBus ? +musBus.gain.value.toFixed(3) : null }),
+    musicTick,
     setSeed: n => { WORLD_SEED = n >>> 0; wstate = WORLD_SEED; },
     getSeed: () => WORLD_SEED,
     press: () => { jumpPressed = true; jumpHeld = true; },
