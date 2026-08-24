@@ -381,16 +381,35 @@ function flyer(x, y, amp, w) {
 /* Bullets travel at 364px/s against a 330px/s runner, so they close at 694 and
    a shot visible 400px out gives ~0.58s to react. They used to close at 850. */
 const BULLET_SPEED = 364;
-const TURRET_RATE = 1.4;
+/* Barrels cycle left -> up -> right. Only one fires early on; later turrets let
+   go of two or three at once. Because only one barrel in three points down the
+   lane, the rate is faster than a single-barrel gun would need. */
+const BARRELS = ['left', 'up', 'right'];
+/* With n turrets phased evenly, hall-level volley cadence is RATE/n. At n=3
+   that must stay clear of the 0.40s a crouch hop costs, so 1.7/3 = 0.57s. */
+const TURRET_RATE = 1.7;
+/* The up muzzle sits above a standing player (46 tall) so someone on the ground
+   is never hit by it - it punishes being airborne over the gun, nothing else. */
+const UP_MUZZLE = 58;
 /* Two turrets closer than this put their shots on top of each other. */
 const TURRET_MIN_GAP = 210;
 
-function turret(x, surfY, mode, phase) {
+function turret(x, surfY, mode, phase, salvo) {
   // high = shoots over a crouching player, low = must be jumped
   if (x < SAFE_X) return;
   const my = mode === 'high' ? surfY - 34 : surfY - 14;
   W.enemies.push({ type: 'turret', x: x - 17, y: my - 20, w: 34, h: 40,
-    my, sy: surfY, mode, cd: phase, rate: TURRET_RATE, dir: -1 });
+    my, sy: surfY, mode, cd: phase, rate: TURRET_RATE, dir: -1,
+    barrel: 0, salvo: salvo, upY: surfY - UP_MUZZLE });
+}
+
+function fireBarrel(e, which) {
+  let bx, by, vx, vy;
+  if (which === 'left')       { bx = e.x - 4;         by = e.my;  vx = -BULLET_SPEED; vy = 0; }
+  else if (which === 'right') { bx = e.x + e.w + 4;   by = e.my;  vx =  BULLET_SPEED; vy = 0; }
+  else                        { bx = e.x + e.w / 2;   by = e.upY; vx = 0; vy = -BULLET_SPEED; }
+  W.bullets.push({ x: bx, y: by, vx, vy, r: 6, life: 4.6, t: 0, aim: which });
+  part(bx, by, vx * -0.35, vy * -0.35 + rnd(-30, 30), 0.2, '#ffcf6b', 3);
 }
 function slasher(x, surfY) {
   if (x < SAFE_X) return;
@@ -512,12 +531,32 @@ function segTurrets(x, y, d) {
     /* Stagger the volleys so they interleave rather than land together. Phases
        stay above the 0.35 offscreen grace so entering the view cannot reset
        them into unison. */
-    turret(tx, y, mode, 0.4 + (i / n) * TURRET_RATE);
+    /* later in the course a turret lets go of two or three barrels at once */
+    const salvo = 1 + (d > 0.6 ? 1 : 0) + (d > 0.85 ? 1 : 0);
+    turret(tx, y, mode, 0.4 + (i / n) * TURRET_RATE, salvo);
   }
 
-  /* cover to duck behind, kept clear of the muzzles */
-  for (let i = 0; i < 2; i++) {
-    if (chance(0.6)) addSolid(x + rnd(80, w - 190), y - 62, 26, 62, 'block');
+  /* Cover blocks go in LOW halls only. A block has to be jumped, and a high
+     lane shot hits anything whose feet are under 40px, so in a high hall - where
+     the answer is simply to duck and keep running - a block would force the one
+     move that gets you shot. In a low hall hopping is already the dodge.
+     They also never sit in an up-shot column, since jumping over a turret is
+     exactly what the up barrel punishes. */
+  if (mode === 'low')
+  {
+    const muzzleXs = [];
+    for (let i = 0; i < n; i++)
+      muzzleXs.push(x + 150 + (n === 1 ? usable * 0.5 : usable * (i / (n - 1))));
+    for (let i = 0; i < 2; i++) {
+      if (!chance(0.6)) continue;
+      for (let tries = 0; tries < 8; tries++) {
+        const bx = x + rnd(80, w - 190);
+        let clear = true;
+        for (const mx of muzzleXs) if (Math.abs((bx + 13) - mx) < 80) { clear = false; break; }
+        /* 44 tall: still stops a lane shot, but quick to hop */
+        if (clear) { addSolid(bx, y - 44, 26, 44, 'block'); break; }
+      }
+    }
   }
   return { w, y };
 }
@@ -1066,11 +1105,15 @@ function updateEntities(dt) {
       if (chance(0.14)) part(e.x + e.w / 2 + rnd(-6, 6), e.y + e.h, rnd(-16, 16), rnd(10, 40), 0.4, '#ff8ad0', 2);
     } else if (e.type === 'turret') {
       e.cd -= dt;
-      if (e.cd <= 0 && P.x < e.x + 40 && P.x > e.x - 1000) {
+      /* fires while you are anywhere near it, not just while you approach - the
+         right barrel only means anything once you are past it */
+      /* The right barrel only means something just after you pass; keeping the
+         window open longer turns it into an endless chase from behind. */
+      if (e.cd <= 0 && P.x > e.x - 1000 && P.x < e.x + 260) {
         e.cd = e.rate;
-        W.bullets.push({ x: e.x - 4, y: e.my, vx: -BULLET_SPEED, vy: 0, r: 6, life: 4.6, t: 0 });
+        for (let k = 0; k < e.salvo; k++) fireBarrel(e, BARRELS[(e.barrel + k) % 3]);
+        e.barrel = (e.barrel + 1) % 3;
         sfx.shoot();
-        part(e.x - 8, e.my, -180, rnd(-40, 40), 0.2, '#ffcf6b', 3);
       }
     } else if (e.type === 'slasher') {
       e.t += dt;
@@ -1409,14 +1452,32 @@ function drawEnemy(e) {
     ctx.restore();
     ctx.fillStyle = '#5a6da8'; ctx.fillRect(e.x, e.y, e.w, 3);
     ctx.fillStyle = '#151a2b'; ctx.fillRect(e.x + 3, e.y + 5, e.w - 6, e.h - 10);
-    /* barrel */
-    ctx.fillStyle = '#3d4a78'; ctx.fillRect(e.x - 15, e.my - 6, 20, 12);
-    ctx.fillStyle = '#151a2b'; ctx.fillRect(e.x - 15, e.my - 2, 14, 4);
-    ctx.save();
-    ctx.shadowColor = 'rgba(255,170,60,.95)'; ctx.shadowBlur = 8 + 18 * chg;
-    ctx.fillStyle = 'rgb(255,' + Math.round(110 + 110 * chg) + ',60)';
-    ctx.fillRect(e.x - 18, e.my - 4, 6, 8);
-    ctx.restore();
+
+    /* three barrels; the ones about to fire glow with the charge */
+    const cx2 = e.x + e.w / 2;
+    const armed = {};
+    for (let k = 0; k < e.salvo; k++) armed[BARRELS[(e.barrel + k) % 3]] = true;
+    const muzzle = (which, hot) => {
+      ctx.save();
+      if (hot) { ctx.shadowColor = 'rgba(255,170,60,.95)'; ctx.shadowBlur = 8 + 18 * chg; }
+      ctx.fillStyle = hot ? 'rgb(255,' + Math.round(110 + 110 * chg) + ',60)' : '#2a3355';
+      if (which === 'left')       ctx.fillRect(e.x - 18, e.my - 4, 6, 8);
+      else if (which === 'right') ctx.fillRect(e.x + e.w + 12, e.my - 4, 6, 8);
+      else                        ctx.fillRect(cx2 - 4, e.upY - 6, 8, 6);
+      ctx.restore();
+    };
+    /* barrel housings */
+    ctx.fillStyle = '#3d4a78';
+    ctx.fillRect(e.x - 15, e.my - 6, 20, 12);                 /* left  */
+    ctx.fillRect(e.x + e.w - 5, e.my - 6, 20, 12);            /* right */
+    ctx.fillRect(cx2 - 6, e.upY, 12, e.y - e.upY + 6);        /* up    */
+    ctx.fillStyle = '#151a2b';
+    ctx.fillRect(e.x - 15, e.my - 2, 14, 4);
+    ctx.fillRect(e.x + e.w + 1, e.my - 2, 14, 4);
+    ctx.fillRect(cx2 - 2, e.upY + 2, 4, 12);
+    muzzle('left',  !!armed.left);
+    muzzle('right', !!armed.right);
+    muzzle('up',    !!armed.up);
     /* charge bar */
     ctx.fillStyle = 'rgba(255,170,60,.18)'; ctx.fillRect(e.x + 6, e.y + e.h - 9, e.w - 12, 4);
     ctx.fillStyle = 'rgba(255,190,90,.95)'; ctx.fillRect(e.x + 6, e.y + e.h - 9, (e.w - 12) * chg, 4);
@@ -1655,11 +1716,17 @@ function render() {
   ctx.save();
   ctx.shadowColor = 'rgba(255,180,80,.9)'; ctx.shadowBlur = 14;
   for (const b of W.bullets) {
-    if (b.x > x1 || b.x < x0) continue;
+    if (b.x > x1 || b.x < x0 || b.y > y1 || b.y + 40 < y0) continue;
+    const vert = b.vy !== 0;
     ctx.fillStyle = '#ffd48a';
-    ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r + 3, b.r - 1, 0, 0, 7); ctx.fill();
+    ctx.beginPath();
+    if (vert) ctx.ellipse(b.x, b.y, b.r - 1, b.r + 3, 0, 0, 7);
+    else      ctx.ellipse(b.x, b.y, b.r + 3, b.r - 1, 0, 0, 7);
+    ctx.fill();
+    /* trail behind, whichever way it is going */
     ctx.fillStyle = 'rgba(255,150,60,.35)';
-    ctx.fillRect(b.x, b.y - 2, 26, 4);
+    if (vert) ctx.fillRect(b.x - 2, b.vy < 0 ? b.y : b.y - 26, 4, 26);
+    else      ctx.fillRect(b.vx < 0 ? b.x : b.x - 26, b.y - 2, 26, 4);
   }
   ctx.restore();
 
