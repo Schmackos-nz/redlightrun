@@ -15,6 +15,8 @@ fixed) course.
 | `A` / `D` or arrows | move |
 | `SPACE` / `W` / `UP` | jump, press again in mid-air to double jump |
 | `S` / `DOWN` | crouch (slide under low ceilings, duck high bullets) |
+| `S` + jump | crouch jump: a low, flat hop (51px up, 106px across) |
+| `SPACE` | on the death screen, run again |
 | `R` | restart | 
 | `M` | mute |
 
@@ -38,6 +40,22 @@ flat breather inserted after most hard segments:
 `flat` `gaps` `pill` (spire field) `crch` (crouch tunnels) `turr` (firing line)
 `up` / `down` (vertical shafts over spike floors) `red` (watcher zone)
 `fly` `slsh` (bladeworks) `gaunt` (spike teeth)
+
+Each type has a `minD` unlock so techniques arrive in order rather than
+everything being possible on the first screen (d = metres / 550):
+
+| from | type |
+| --- | --- |
+| 0m | `flat` `gaps` |
+| 33m | `crch` |
+| 55m | `pill` |
+| 88m | `red` |
+| 110m | `up` |
+| 143m | `fly` |
+| 165m | `down` |
+| 187m | `turr` |
+| 220m | `slsh` |
+| 253m | `gaunt`, and the first ceiling over any hazard |
 
 Difficulty ramps over the first 11,000px, then holds. It is derived from the
 **generation cursor**, not the player position - otherwise a segment would get a
@@ -68,3 +86,22 @@ Measured from the real physics, not assumed:
 Generation is capped against those numbers: obstacles never exceed 210px, pits
 never exceed 260px, shaft rungs rise 100px, and crouch doorways always leave
 between 26 and 45px so they need a crouch but are never impassable.
+
+### The unjumpable band
+
+The rule that matters most for how fair the game feels: **no ceiling above a
+surface the player stands on may sit between 46 and 170px.** Below 46 you cannot
+stand up at all, so it reads as a crouch tunnel. At 170+ a full standing jump
+(feet 120 + 46 of player = 166) fits underneath. In between you can stand up but
+not jump, which silently turns an ordinary hop into a frame-perfect input. That
+band was the single biggest source of unfair-feeling deaths.
+
+Two related invariants, both measured rather than assumed:
+
+- A spike patch with ground either side is a *tooth*. A full jump taken from its
+  edge lands the player box across `[+169, +195]`, so tooth width plus landing
+  strip must exceed 195 or the player's own default input overshoots the gap and
+  lands them on the next tooth.
+- Pillar tops are sized against the jump that *arrives* at them: gap at most 150
+  so the jump always reaches, and gap + top width at least 215 so the top
+  catches the box with ~20px of overlap rather than a few pixels of edge.

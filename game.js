@@ -39,6 +39,7 @@ const PPM        = 20;      // pixels per "metre" of score
 const GRAV       = 2600;
 const MAX_FALL   = 1500;
 const JUMP_V     = 800;     // single jump apex ~123px, double ~245px
+const CROUCH_JUMP_V = 528;  // low hop: ~54px, fits a crouched player under a 150 ceiling
 const DBL_V      = 760;
 const RUN_SPEED  = 330;
 const CROUCH_SPD = 155;
@@ -147,7 +148,12 @@ window.addEventListener('keydown', e => {
   if (keyFlag(e.code, true)) e.preventDefault();
   if (e.code === 'KeyM') setMute(!muted);
   if (e.code === 'KeyR' && (S.mode === 'play' || S.mode === 'dead')) startRun();
-  if (e.code === 'Enter' && S.mode === 'menu') startRun();
+  if (e.code === 'Space' || e.code === 'Enter') {
+    if (S.mode === 'menu') startRun();
+    /* only once the score is actually on screen, so mashing jump as you die
+       cannot skip past your own result */
+    else if (S.mode === 'dead' && S.canRetry) { commitScore(); startRun(); }
+  }
 });
 window.addEventListener('keyup', e => { if (keyFlag(e.code, false)) e.preventDefault(); });
 window.addEventListener('blur', () => { K.left = K.right = K.up = K.down = false; jumpHeld = false; });
@@ -255,20 +261,38 @@ function segPillars(x, y, d) {
   let cx = x;
   addGround(cx, y, 95); cx += 95;
   const n = 3 + ri(0, 1) + Math.floor(d * 2);
-  const span = n * (150 + 55 * d) + 70;
-  addSolid(cx, y, span, 900, 'rock');
-  floorSpikes(cx + 5, y, span - 10);
-  let px = cx + 35, h = rnd(55, 90);
   const hiMax = 105 + 115 * d;
+
+  /* Lay the tops out first, so each one can be sized against the jump that
+     ARRIVES at it and the spike floor can be cut to fit. A full standing jump
+     from a pillar edge puts the player box down across [+169, +195], so the gap
+     stays at 150 or under (the jump always reaches, with ~19px to spare) and
+     gap + width is at least 215, so the top catches the box with ~20px of
+     overlap instead of a few pixels of edge. */
+  const cols = [];
+  let h = rnd(55, 90);
+  let gap = rnd(120, 150);
+  let px = cx + gap;
   for (let i = 0; i < n; i++) {
     h = clamp(h + rnd(-80, 80), 55, hiMax);              // gentle staircase, never a 200px step
-    const pw = rnd(46, 76);
-    addSolid(px, y - h, pw, h + 900, 'pillar');
-    if (i === 1 && d > 0.35 && chance(0.4)) addSpikes(px, y - h - 18 - 150, pw, 'down');
-    px += pw + rnd(95, 130 + 55 * d);
+    let pw = rnd(70, 100);
+    if (gap + pw < 215) pw = 215 - gap;                  // ~20px of landing margin, not 5
+    cols.push({ px, pw, h });
+    gap = rnd(120, 150);
+    px += pw + gap;
+  }
+  const span = px - cx;                                  // ends one gap past the last top
+
+  addSolid(cx, y, span, 900, 'rock');
+  floorSpikes(cx + 5, y, span - 10);
+  for (let i = 0; i < n; i++) {
+    const c = cols[i];
+    addSolid(c.px, y - c.h, c.pw, c.h + 900, 'pillar');
+    /* ceiling spikes kill on contact, so they get more room than a slab would */
+    if (i === 1 && d > CEIL_D && chance(0.4)) addSpikes(c.px, y - c.h - 18 - 210, c.pw, 'down');
   }
   cx += span;
-  addGround(cx, y, 120); cx += 120;
+  addGround(cx, y, 130); cx += 130;
   return { w: cx - x, y };
 }
 
@@ -279,16 +303,18 @@ function segCrouch(x, y, d) {
   for (let i = 0; i < n; i++) {
     const len = rnd(170, 290 + 90 * d);
     addGround(cx, y, len);
-    const spiked = chance(0.45 + 0.3 * d);
+    const spiked = d > CEIL_D && chance(0.35 + 0.35 * d);
     const gapTop = spiked ? y - 52 : y - 34;             // crouch box is 24 tall
     addSolid(cx, gapTop - 120, len, 120, 'slab');
     addBack(cx, gapTop, len, y - gapTop);
     if (spiked) addSpikes(cx + 6, y - 52, len - 12, 'down');
     cx += len;
-    const brk = rnd(80, 150);
+    const brk = rnd(85, 180);
     addGround(cx, y, brk);
-    /* spikes belong in the open break, where there is headroom to jump them */
-    if (d > 0.4 && brk > 110 && chance(0.4)) floorSpikes(cx + brk * 0.5 - 22, y, 44);
+    /* Spikes go in the open break, and need a clear run-up either side: the
+       tunnel mouths are low, so keep 50px of open ground between them. */
+    if (d > 0.4 && brk >= 145 && chance(0.45))
+      floorSpikes(cx + 52, y, Math.min(44, brk - 104));
     cx += brk;
   }
   return { w: cx - x, y };
@@ -395,32 +421,53 @@ function segSlash(x, y, d) {
 function segGauntlet(x, y, d) {
   let cx = x;
   addGround(cx, y, 90); cx += 90;
-  const n = 3 + ri(0, 2) + Math.floor(d * 2);
+  const n = 3 + ri(0, 1) + Math.floor(d);
   for (let i = 0; i < n; i++) {
     const sw = rnd(48, 78 + 40 * d);
     addGround(cx, y, sw); floorSpikes(cx, y, sw); cx += sw;
-    const gapw = rnd(70, 120);
+    /* A full standing jump carries 195px, so the landing strip has to be at
+       least 195 - sw wide or the player's own default input overshoots the gap
+       and lands them on the next tooth. 155 covers the narrowest tooth (48).
+       A crouch hop (106) is the faster optional line, not a requirement. */
+    const gapw = rnd(155, 215);
     addGround(cx, y, gapw);
-    if (chance(0.35 + 0.3 * d)) addSolid(cx - 10, y - 250, gapw + 20, 120, 'slab');
+    /* A ceiling over the landing zone says "do not double jump here", and that
+       is all it says. CEIL_CLEAR leaves room for a full standing jump (feet 120
+       + 46 of player = 166) so the hop is never a precision input, while a
+       double jump (274) still bonks. It stops at the far edge of the gap, so the
+       take-off for the next patch always has open sky above it. */
+    if (d > CEIL_D && chance(0.3 + 0.3 * d))
+      addSolid(cx - 10, y - CEIL_CLEAR - 120, gapw + 10, 120, 'slab');
     cx += gapw;
   }
   addGround(cx, y, 110); cx += 110;
   return { w: cx - x, y };
 }
 
+/* Difficulty is distance/11000 and a metre is 20px, so d = metres / 550.
+   minD is the earliest a segment type may appear - techniques arrive in order
+   instead of everything being possible from the first screen. */
 const POOL = [
-  { id: 'flat',  f: segFlat,      w: () => 2.6,               easy: true },
-  { id: 'gaps',  f: segGaps,      w: () => 2.4,               easy: true },
-  { id: 'pill',  f: segPillars,   w: d => 0.5 + 1.8 * d },
-  { id: 'crch',  f: segCrouch,    w: d => 0.7 + 1.6 * d },
-  { id: 'turr',  f: segTurrets,   w: d => 0.35 + 1.9 * d },
-  { id: 'up',    f: segShaftUp,   w: d => 0.3 + 1.7 * d },
-  { id: 'down',  f: segShaftDown, w: d => 0.2 + 1.5 * d },
-  { id: 'red',   f: segRedlight,  w: d => 0.55 + 1.7 * d },
-  { id: 'fly',   f: segFlyers,    w: d => 0.25 + 1.5 * d },
-  { id: 'slsh',  f: segSlash,     w: d => 0.2 + 1.6 * d },
-  { id: 'gaunt', f: segGauntlet,  w: d => 0.35 + 1.7 * d }
+  { id: 'flat',  f: segFlat,      w: () => 2.6,               minD: 0 },
+  { id: 'gaps',  f: segGaps,      w: () => 2.4,               minD: 0 },
+  { id: 'crch',  f: segCrouch,    w: d => 0.7 + 1.6 * d,      minD: 0.06 },  //  33m
+  { id: 'pill',  f: segPillars,   w: d => 0.5 + 1.8 * d,      minD: 0.10 },  //  55m
+  { id: 'red',   f: segRedlight,  w: d => 0.55 + 1.7 * d,     minD: 0.16 },  //  88m
+  { id: 'up',    f: segShaftUp,   w: d => 0.3 + 1.7 * d,      minD: 0.20 },  // 110m
+  { id: 'fly',   f: segFlyers,    w: d => 0.25 + 1.5 * d,     minD: 0.26 },  // 143m
+  { id: 'down',  f: segShaftDown, w: d => 0.2 + 1.5 * d,      minD: 0.30 },  // 165m
+  { id: 'turr',  f: segTurrets,   w: d => 0.35 + 1.9 * d,     minD: 0.34 },  // 187m
+  { id: 'slsh',  f: segSlash,     w: d => 0.2 + 1.6 * d,      minD: 0.40 },  // 220m
+  { id: 'gaunt', f: segGauntlet,  w: d => 0.35 + 1.7 * d,     minD: 0.46 }   // 253m
 ];
+
+/* No ceiling may hang over a hazard before this point. */
+const CEIL_D = 0.46;
+/* Minimum room under any ceiling the player must jump from or land under.
+   A standing player peaks at 166 (120 feet + 46 tall), so 180 always fits.
+   Never use a value in 46..170: that is tall enough to stand up in but too
+   short to jump in, which turns an ordinary hop into a precision input. */
+const CEIL_CLEAR = 180;
 
 const SEG_LABEL = {
   flat: '', gaps: 'CHASM', pill: 'SPIRE FIELD', crch: 'THE CRAWL',
@@ -449,12 +496,12 @@ function generateSeeded() {
   } else {
     let tot = 0;
     const ws = POOL.map(p => {
-      let v = p.w(d);
+      let v = d < p.minD ? 0 : p.w(d);
       if (p.id === W.lastType) v *= 0.15;
       tot += v; return v;
     });
     let r = rngSrc() * tot;
-    entry = POOL[POOL.length - 1];
+    entry = POOL[0];
     for (let i = 0; i < POOL.length; i++) { r -= ws[i]; if (r <= 0) { entry = POOL[i]; break; } }
   }
   const x = W.genX, y = W.genY;
@@ -516,6 +563,8 @@ function startRun() {
 
   S.mode = 'play'; S.startX = P.x; S.dist = 0; S.maxX = P.x; S.t = 0;
   S.shake = 0; S.cause = ''; S.deadT = 0; S.litState = 'none'; S.lbl = null;
+  S.canRetry = false;
+  jumpPressed = false;                                   // drop any stale buffered press
   $('zone').textContent = '';
   storm.x = P.x - 760; storm.v = 55; storm.flash = 0;
   cam.x = P.x - viewW * 0.36; cam.y = P.y - viewH * 0.55;
@@ -581,6 +630,7 @@ function showDeath() {
   renderScores($('dScores'), null);
   $('death').classList.remove('hidden'); $('death').classList.add('on');
   $('hud').classList.add('hidden');
+  S.canRetry = true;
 }
 function commitScore() {
   if (pendingScore < 0) return;
@@ -636,7 +686,9 @@ function physics(dt) {
   else if (!wantCrouch && P.crouch && !standBlocked()) { P.crouch = false; setHeight(PH); }
 
   /* ---- horizontal ---- */
-  const maxSpd = P.crouch ? CROUCH_SPD : RUN_SPEED;
+  /* Crouching only slows the ground crawl. In the air you keep full speed, or a
+     crouch jump would be too short to actually cross anything. */
+  const maxSpd = (P.crouch && P.onGround) ? CROUCH_SPD : RUN_SPEED;
   let dir = (K.right ? 1 : 0) - (K.left ? 1 : 0);
   const acc = P.onGround ? ACC_GROUND : ACC_AIR;
   if (dir !== 0) {
@@ -655,11 +707,13 @@ function physics(dt) {
 
   if (P.buffer > 0) {
     if (P.onGround || P.coyote > 0) {
-      P.vy = -JUMP_V; P.jumps = 1; P.buffer = 0; P.coyote = 0; P.onGround = false;
+      /* a crouch jump is a deliberate low hop - the tool for low ceilings */
+      P.vy = -(P.crouch ? CROUCH_JUMP_V : JUMP_V);
+      P.jumps = 1; P.buffer = 0; P.coyote = 0; P.onGround = false;
       sfx.jump();
       for (let i = 0; i < 7; i++) part(P.x + P.w / 2 + rnd(-9, 9), P.y + P.h, rnd(-70, 70), rnd(-30, 60), 0.35, '#7fe4ff', 2.6);
     } else if (P.jumps < 2) {
-      P.vy = -DBL_V; P.jumps = 2; P.buffer = 0;
+      P.vy = -(P.crouch ? DBL_V * 0.72 : DBL_V); P.jumps = 2; P.buffer = 0;
       sfx.dbl();
       for (let i = 0; i < 14; i++) {
         const a = Math.PI * (0.15 + Math.random() * 0.7);
