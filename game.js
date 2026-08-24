@@ -54,6 +54,20 @@ const GRAV       = 2600;
 const MAX_FALL   = 1500;
 const JUMP_V     = 800;     // single jump apex ~123px, double ~245px
 const CROUCH_JUMP_V = 528;  // low hop: ~54px, fits a crouched player under a 150 ceiling
+/* Charge jump. It kicks in when you are STILL HOLDING jump at the top of a
+   normal jump - an input that otherwise does nothing - so it never delays a
+   normal jump, which has to stay instant because short hops depend on releasing
+   early. From there you keep rising while you hold, and let go when you like:
+   a brief hold is a little above a normal jump, a full hold reaches 228, which
+   is exactly double-jump height. The double jump itself is untouched. */
+const LIFT_SPEED = 300;     // px/s of hold-to-rise
+const LIFT_BUDGET = 108;    // 120 (normal apex) + 108 = 228, a double jump
+const LIFT_COMMIT = 18;     // lift under this is free: a stray hold costs nothing
+/* Tapping crouch in mid-air drops you out of the sky, keeping whatever
+   direction the jump had. */
+const DIVE_V = 900;
+const CHARGE_MAX = 2;
+const CHARGE_REFILL = 5.5;  // seconds per use
 const DBL_V      = 760;
 const RUN_SPEED  = 330;
 const CROUCH_SPD = 155;
@@ -295,18 +309,23 @@ const sfx = {
   red:   () => { tone(300, 0.22, 'sawtooth', 0.16, 150); noise(0.2, 0.08, 500); },
   die:   () => { tone(180, 0.5, 'sawtooth', 0.28, 40); noise(0.5, 0.22, 900); },
   mark:  () => tone(1050, 0.09, 'sine', 0.10, 1400),
-  lob:   () => { tone(150, 0.16, 'sine', 0.16, 320); noise(0.1, 0.07, 600); }
+  lob:   () => { tone(150, 0.16, 'sine', 0.16, 320); noise(0.1, 0.07, 600); },
+  charge: () => { tone(520, 0.2, 'sawtooth', 0.15, 1180); noise(0.09, 0.05, 3000); },
+  dive:  () => { tone(700, 0.14, 'square', 0.13, 190); noise(0.08, 0.06, 1600); },
+  recharge: () => tone(880, 0.08, 'sine', 0.07, 1240)
 };
 
 /* ------------------------------ input ---------------------------------- */
 const K = { left: false, right: false, up: false, down: false };
-let jumpPressed = false, jumpHeld = false;
+let jumpPressed = false, jumpHeld = false, downPressed = false;
 
 function keyFlag(code, down) {
   switch (code) {
     case 'ArrowLeft': case 'KeyA': K.left = down; return true;
     case 'ArrowRight': case 'KeyD': K.right = down; return true;
-    case 'ArrowDown': case 'KeyS': K.down = down; return true;
+    case 'ArrowDown': case 'KeyS':
+      if (down && !K.down) downPressed = true;
+      K.down = down; return true;
     case 'ArrowUp': case 'KeyW': case 'Space':
       if (down && !jumpHeld) jumpPressed = true;
       jumpHeld = down; K.up = down; return true;
@@ -349,7 +368,7 @@ const ZONES = [];
 function zone(id, on, off) { ZONES.push({ el: $(id), on, off, active: false }); }
 zone('tL', () => K.left = true,  () => K.left = false);
 zone('tR', () => K.right = true, () => K.right = false);
-zone('tC', () => K.down = true,  () => K.down = false);
+zone('tC', () => { K.down = true; downPressed = true; }, () => K.down = false);
 zone('tJ', () => { jumpPressed = true; jumpHeld = true; }, () => { jumpHeld = false; });
 
 function releaseAllTouch() {
@@ -434,7 +453,27 @@ function addCrumble(x, y, w) {
 /* A crumbled platform is not there; everything else always is. */
 function solidOn(s) { return !s.crumb || s.crumb.state !== 'gone'; }
 
+/* Which moving platform is holding the player up, judged by where things were
+   BEFORE this frame's move. Resting exactly flush produces no AABB overlap, so
+   the collision pass sets no rider on those frames - relying on it alone lets
+   the platform slide out from under you a frame at a time. */
+function supportingMover(oldPos) {
+  const feet = P.y + P.h;
+  for (const s of W.solids) {
+    if (!s.mov || !solidOn(s)) continue;
+    const o = oldPos.get(s);
+    if (!o) continue;
+    if (P.x + P.w < o.x - 2 || P.x > o.x + s.w + 2) continue;
+    if (feet < o.y - 5 || feet > o.y + 8) continue;
+    return s;
+  }
+  return null;
+}
+
 function updatePlatforms(dt) {
+  const oldPos = new Map();
+  for (const s of W.solids) if (s.mov) oldPos.set(s, { x: s.x, y: s.y });
+  const carrier = P.onGround ? supportingMover(oldPos) : null;
   for (const s of W.solids) {
     if (s.mov) {
       const m = s.mov;
@@ -450,10 +489,11 @@ function updatePlatforms(dt) {
       else if (c.state === 'gone') { c.t += dt; if (c.t >= c.respawn) { c.state = 'solid'; c.t = 0; } }
     }
   }
-  /* ride whatever you are standing on */
-  if (P.riding && P.riding.mov && P.onGround) {
-    P.x += P.riding.dx;
-    P.y += P.riding.dy;
+  /* ride whatever is holding you up */
+  if (carrier) {
+    P.x += carrier.dx;
+    P.y += carrier.dy;
+    P.riding = carrier;
   }
 }
 function addGround(x, y, w)         { addSolid(x, y, w, 1100, 'rock'); }
@@ -485,7 +525,7 @@ const BULLET_SPEED = 364;
 const BARRELS = ['left', 'up', 'right'];
 /* With n turrets phased evenly, hall-level volley cadence is RATE/n. At n=3
    that must stay clear of the 0.40s a crouch hop costs, so 1.7/3 = 0.57s. */
-const TURRET_RATE = 1.7;
+const TURRET_RATE = 1.95;
 /* The up muzzle sits above a standing player (46 tall) so someone on the ground
    is never hit by it - it punishes being airborne over the gun, nothing else. */
 const UP_MUZZLE = 58;
@@ -720,7 +760,9 @@ function segShaftDown(x, y, d) {
   const drop = 130;
   const botY = y + drop * steps;
   addBack(x, y, SW, botY - y + 20);
-  addSolid(x + SW - 40, y - 340, 40, (botY - 62) - (y - 340), 'rock');
+  /* 460, not 340: a charge jump into a double reaches 339px of foot clearance
+     and would otherwise hop this wall and skip the shaft entirely */
+  addSolid(x + SW - 40, y - 460, 40, (botY - 62) - (y - 460), 'rock');
   addSolid(x, botY, SW, 900, 'rock');
   floorSpikes(x + 6, botY, SW - 175);
   for (let i = 1; i <= steps; i++) {
@@ -896,6 +938,50 @@ function segDropHoles(x, y, d) {
   return { w: runW + 150, y: botY };
 }
 
+/* ---- elevators ---------------------------------------------------------
+   Gaps too wide to jump, and climbs too tall to hop, crossed by a platform that
+   carries you. Riding counts as progress for the wall - horizontally it moves
+   your furthest point, vertically it gains you height - so using the intended
+   route never feeds the chase. Cycles are kept short so waiting is brief. */
+const ELEV_D = 0.34;
+
+function segLift(x, y, d) {
+  let cx = x;
+  addGround(cx, y, 150); cx += 150;
+
+  /* Only hoist upward when the course is not already high: segLift cannot be
+     tagged up/down in the pool because it picks its variant here, so it steers
+     itself instead and leaves the descending segments to bring things back. */
+  if (heightAbove() > 900 || chance(0.5)) {
+    /* ---- horizontal ferry over a chasm ---- */
+    const gap = rnd(470, 600 + 90 * d);                  // double jump only carries 327
+    pit(cx, y, gap);
+    const pw = 124;
+    const amp = (gap - pw) / 2 + 34;                     // overlaps both ledges
+    /* flush with the ledges, so boarding is a step across rather than a hop
+       onto a moving target over a spike pit */
+    addMover(cx + gap / 2 - pw / 2, y, pw, 'x', amp, rnd(1.15, 1.5), rnd(0, 6));
+    cx += gap;
+    addGround(cx, y, 190); cx += 190;
+    return { w: cx - x, y };
+  }
+
+  /* ---- vertical hoist to a higher shelf ---- */
+  /* 400 at the least: a charge jump into a double lifts 336, and anything
+     shorter than that could just be hopped */
+  const rise = 400 + ri(0, 2) * 130;
+  const shaftW = 250;
+  pit(cx, y, shaftW);
+  const pw = 132;
+  /* exactly half the rise, so it sits flush with the floor at the bottom of its
+     travel and flush with the exit shelf at the top */
+  addMover(cx + shaftW / 2 - pw / 2, y - rise / 2, pw, 'y', rise / 2,
+           rnd(0.75, 1.05), rnd(0, 6));
+  cx += shaftW;
+  addGround(cx, y - rise, 230); cx += 230;
+  return { w: cx - x, y: y - rise };
+}
+
 const POOL = [
   { id: 'flat',  f: segFlat,      w: () => 2.6,               minD: 0 },
   { id: 'gaps',  f: segGaps,      w: () => 2.4,               minD: 0 },
@@ -909,13 +995,36 @@ const POOL = [
   { id: 'slsh',  f: segSlash,     w: d => 0.2 + 1.6 * d,      minD: 0.40 },  // 220m
   { id: 'gaunt', f: segGauntlet,  w: d => 0.35 + 1.7 * d,     minD: 0.46 },  // 253m
   { id: 'climb', f: segClimb,     w: d => 0.9 + 2.2 * d,      minD: 0.22, up: 1 },   // 121m
-  { id: 'holes', f: segDropHoles, w: d => 0.7 + 1.8 * d,      minD: 0.26, up: -1 }   // 143m
+  { id: 'holes', f: segDropHoles, w: d => 0.7 + 1.8 * d,      minD: 0.26, up: -1 },  // 143m
+  { id: 'lift',  f: segLift,      w: d => 0.8 + 1.9 * d,      minD: ELEV_D }        // 187m
 ];
 
 /* How far the course currently sits above where it started. Ascending and
    descending segments are steered by this so the world cannot climb away
    forever or sink into the basement. */
 function heightAbove() { return S.startY - W.genY; }
+
+/* The wall punishes choosing not to move, not being unable to. Standing on a lip
+   waiting for an elevator is the intended play, so it must not wind the wall up. */
+function waitingOnLift() {
+  const px = P.x + P.w / 2, feet = P.y + P.h;
+  for (const s of W.solids) {
+    if (!s.mov) continue;
+    const m = s.mov;
+    /* Test against the whole TRAVEL ENVELOPE, not where the platform happens to
+       be: you wait on the lip while it is away at the far end, which is exactly
+       when its current position is furthest from you. */
+    if (m.axis === 'x') {
+      if (px < m.bx - m.amp - 170 || px > m.bx + m.amp + s.w + 170) continue;
+      if (Math.abs(m.by - feet) > 240) continue;
+    } else {
+      if (px < s.x - 210 || px > s.x + s.w + 210) continue;
+      if (feet < m.by - m.amp - 170 || feet > m.by + m.amp + 170) continue;
+    }
+    return true;
+  }
+  return false;
+}
 
 /* No ceiling may hang over a hazard before this point. */
 const CEIL_D = 0.46;
@@ -927,7 +1036,7 @@ const CEIL_CLEAR = 180;
 
 const SEG_LABEL = {
   flat: '', gaps: 'CHASM', pill: 'SPIRE FIELD', crch: 'THE CRAWL',
-  climb: 'THE ASCENT', holes: 'THE DROP',
+  climb: 'THE ASCENT', holes: 'THE DROP', lift: 'THE CROSSING',
   turr: 'FIRING LINE', up: 'ASCENT', down: 'DESCENT', red: 'WATCHER ZONE',
   fly: 'SWARM', slsh: 'BLADEWORKS', gaunt: 'THE TEETH'
 };
@@ -1036,7 +1145,9 @@ function prune(minX) {
 
 /* ------------------------------ player --------------------------------- */
 const P = { x: 0, y: 0, vx: 0, vy: 0, w: PW, h: PH, crouch: false, onGround: false,
-            jumps: 0, coyote: 0, buffer: 0, face: 1, run: 0, alive: true, trail: [] };
+            jumps: 0, coyote: 0, buffer: 0, face: 1, run: 0, alive: true, trail: [],
+            charges: CHARGE_MAX, refill: 0, charged: false, riding: null,
+            lift: 0, liftUsed: false, liftDone: 0 };
 
 const S = { mode: 'menu', startX: 0, best: 0, dist: 0, maxX: 0, t: 0,
             shake: 0, cause: '', deadT: 0, litState: 'none' };
@@ -1077,6 +1188,9 @@ function startRun() {
   P.x = -180; P.y = -PH; P.vx = 0; P.vy = 0; P.w = PW; P.h = PH;
   P.crouch = false; P.onGround = true; P.jumps = 0; P.coyote = 0; P.buffer = 0;
   P.face = 1; P.run = 0; P.alive = true; P.trail.length = 0;
+  downPressed = false;
+  P.charges = CHARGE_MAX; P.refill = 0; P.charged = false; P.riding = null;
+  P.lift = 0; P.liftUsed = false; P.liftDone = 0;
   SAFE_X = P.x + 950;
 
   S.mode = 'play'; S.startX = P.x; S.startY = 0; S.dist = 0; S.maxX = P.x; S.t = 0;
@@ -1216,6 +1330,16 @@ function physics(dt) {
   if (wantCrouch && !P.crouch)      { P.crouch = true; setHeight(PHC); }
   else if (!wantCrouch && P.crouch && !standBlocked()) { P.crouch = false; setHeight(PH); }
 
+  /* ---- dive: crouch in mid-air to come straight back down ---- */
+  if (downPressed && !P.onGround && P.vy > -DIVE_V) {
+    P.vy = DIVE_V;
+    P.lift = 0;                                          // cancels a charge lift
+    sfx.dive();
+    for (let i = 0; i < 9; i++)
+      part(P.x + P.w / 2 + rnd(-8, 8), P.y + 6, rnd(-90, 90), rnd(-130, -40), 0.3, '#9fd8ff', 2.6);
+  }
+  downPressed = false;
+
   /* ---- horizontal ---- */
   /* Crouching only slows the ground crawl. In the air you keep full speed, or a
      crouch jump would be too short to actually cross anything. */
@@ -1253,6 +1377,32 @@ function physics(dt) {
       }
     }
   }
+  /* ---- charge jump ---- */
+  /* jumps === 1 means this is still the ground jump: the charge is never
+     available off a double jump, only in addition to one */
+  /* Not off a crouch hop: that hop exists to stay LOW under a tight ceiling, and
+     lifting it to 159px would defeat the one thing it is for. */
+  if (jumpHeld && !P.onGround && !P.crouch && !P.charged &&
+      P.jumps === 1 && P.vy >= 0 && P.charges > 0) {
+    P.charged = true;                                    // one lift per time airborne
+    P.lift = LIFT_BUDGET; P.liftUsed = false; P.liftDone = 0;
+  }
+  if (P.lift > 0) {
+    if (!jumpHeld || P.onGround) { P.lift = 0; }         // let go and you stop rising
+    else {
+      const rise = Math.min(LIFT_SPEED * dt, P.lift);
+      /* drive the exact rise rather than a flat -LIFT_SPEED: on the last frame
+         the budget is partly spent, and holding full speed there coasts you
+         past the cap (236 instead of 228) */
+      P.vy = -(rise / dt) - GRAV * dt;   // gravity lands after this; aim above it
+      P.lift -= rise; P.liftDone += rise;
+      if (!P.liftUsed && P.liftDone >= LIFT_COMMIT) {
+        P.liftUsed = true; P.charges--; P.refill = 0; sfx.charge();
+      }
+      if (P.liftUsed && chance(0.55))
+        part(P.x + P.w / 2 + rnd(-8, 8), P.y + P.h, rnd(-70, 70), rnd(70, 170), 0.35, '#ffe066', 3);
+    }
+  }
   if (!jumpHeld && P.vy < -220) P.vy = -220;              // variable jump height
 
   /* ---- gravity ---- */
@@ -1286,6 +1436,7 @@ function physics(dt) {
     else if (P.vy < 0)   { P.y = s.y + s.h; P.vy = 0; }
   }
   if (P.onGround) {
+    P.charged = false; P.lift = 0; P.liftUsed = false;   // a new jump, a new chance to lift
     if (wasAir) {
       sfx.land();
       for (let i = 0; i < 8; i++) part(P.x + P.w / 2 + rnd(-12, 12), P.y + P.h, rnd(-110, 110), rnd(-60, -10), 0.3, '#8fa8d8', 2.4);
@@ -1293,6 +1444,12 @@ function physics(dt) {
     P.jumps = 0;
   }
   P.run += Math.abs(P.vx) * dt;
+
+  /* uses trickle back */
+  if (P.charges < CHARGE_MAX) {
+    P.refill += dt;
+    if (P.refill >= CHARGE_REFILL) { P.refill = 0; P.charges++; sfx.recharge(); }
+  } else P.refill = 0;
 }
 
 /* ------------------------------ hazards -------------------------------- */
@@ -1519,6 +1676,10 @@ function update(dt) {
     storm.boost = Math.max(0, storm.boost - boostMax * (adv / BOOST_SHED));
   } else if (P.y < S.bestY - 8) {
     S.stallT = 0; S.bestY = P.y;                         // genuinely higher than before
+  } else if (P.riding && P.riding.mov) {
+    S.stallT = 0;                                        // being carried is progress
+  } else if (waitingOnLift()) {
+    S.stallT = 0;                                        // waiting for one is too
   } else if (!redFreeze) {
     S.stallT += dt;
   }
@@ -1978,6 +2139,55 @@ function drawPlayer() {
     ctx.fillStyle = 'rgba(140,230,255,.35)';
     ctx.fillRect(x + w / 2 - 2 + sw, y + h - 3, 4, 3);
   }
+  /* ---- charge uses, worn on the chest ---- */
+  {
+    const bw = 7, bh = 11, gap = 3;
+    const total = CHARGE_MAX * bw + (CHARGE_MAX - 1) * gap;
+    const bx0 = x + w / 2 - total / 2;
+    const by = y + (P.crouch ? 5 : 13);
+    for (let i = 0; i < CHARGE_MAX; i++) {
+      const bx = bx0 + i * (bw + gap);
+      /* this slot is full, empty, or the one currently refilling */
+      const full = i < P.charges;
+      const filling = !full && i === P.charges && P.charges < CHARGE_MAX;
+      const prog = filling ? clamp(P.refill / CHARGE_REFILL, 0, 1) : 0;
+      const bolt = () => {
+        ctx.beginPath();
+        ctx.moveTo(bx + bw * 0.62, by);
+        ctx.lineTo(bx + bw * 0.06, by + bh * 0.58);
+        ctx.lineTo(bx + bw * 0.44, by + bh * 0.58);
+        ctx.lineTo(bx + bw * 0.30, by + bh);
+        ctx.lineTo(bx + bw * 0.96, by + bh * 0.40);
+        ctx.lineTo(bx + bw * 0.56, by + bh * 0.40);
+        ctx.closePath();
+      };
+      /* empty socket */
+      ctx.save();
+      bolt();
+      ctx.fillStyle = 'rgba(10,18,34,.75)'; ctx.fill();
+      ctx.restore();
+      if (full || prog > 0) {
+        ctx.save();
+        bolt();
+        ctx.clip();
+        if (full) {
+          ctx.shadowColor = 'rgba(255,224,102,.95)'; ctx.shadowBlur = 7;
+          ctx.fillStyle = P.lift > 0 ? '#fffbe0' : '#ffe066';
+          ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+        } else {
+          ctx.fillStyle = 'rgba(255,224,102,.55)';      /* fills from the bottom */
+          ctx.fillRect(bx - 1, by + bh * (1 - prog), bw + 2, bh * prog + 1);
+        }
+        ctx.restore();
+      }
+      ctx.save();
+      bolt();
+      ctx.strokeStyle = full ? 'rgba(255,240,170,.9)' : 'rgba(150,170,210,.45)';
+      ctx.lineWidth = 1; ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   /* double-jump ring */
   if (!P.onGround && P.jumps < 2) {
     ctx.save();
@@ -2214,6 +2424,8 @@ if (typeof window !== 'undefined' && window.__RLR_DEBUG) {
     setSeed: n => { WORLD_SEED = n >>> 0; wstate = WORLD_SEED; },
     getSeed: () => WORLD_SEED,
     press: () => { jumpPressed = true; jumpHeld = true; },
+    tapDown: () => { downPressed = true; K.down = true; },
+    liftDown: () => { K.down = false; },
     release: () => { jumpHeld = false; },
     frozen: () => redFreeze, cause: () => S.cause };
 }
