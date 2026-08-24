@@ -347,7 +347,7 @@ bindTouch($('tJ'), () => { jumpPressed = true; jumpHeld = true; }, () => { jumpH
 /* ------------------------------ world ---------------------------------- */
 const W = {
   solids: [], spikes: [], enemies: [], bullets: [], zones: [], parts: [], backs: [],
-  segs: [], genX: 0, genY: 0, lastType: '', n: 0
+  drops: [], segs: [], genX: 0, genY: 0, lastType: '', n: 0
 };
 
 /* nothing that can kill you on its own spawns before this world x */
@@ -358,6 +358,41 @@ function addBack(x, y, w, h) { W.backs.push({ x, y, w, h }); }
 
 function addSolid(x, y, w, h, kind) { W.solids.push({ x, y, w, h, oneWay: false, kind: kind || 'rock' }); }
 function addLedge(x, y, w)          { W.solids.push({ x, y, w, h: 20, oneWay: true, kind: 'ledge' }); }
+/* A platform that slides back and forth along one axis and carries its rider. */
+function addMover(x, y, w, axis, amp, sp, phase) {
+  W.solids.push({ x, y, w, h: 20, oneWay: true, kind: 'mover', dx: 0, dy: 0,
+    mov: { axis, amp, sp, t: phase || 0, bx: x, by: y } });
+}
+/* A platform that gives way shortly after you land on it, then comes back. */
+function addCrumble(x, y, w) {
+  W.solids.push({ x, y, w, h: 20, oneWay: true, kind: 'crumble',
+    crumb: { state: 'solid', t: 0, delay: 0.5, respawn: 2.6 } });
+}
+/* A crumbled platform is not there; everything else always is. */
+function solidOn(s) { return !s.crumb || s.crumb.state !== 'gone'; }
+
+function updatePlatforms(dt) {
+  for (const s of W.solids) {
+    if (s.mov) {
+      const m = s.mov;
+      m.t += dt;
+      const nx = m.bx + (m.axis === 'x' ? Math.sin(m.t * m.sp) * m.amp : 0);
+      const ny = m.by + (m.axis === 'y' ? Math.sin(m.t * m.sp) * m.amp : 0);
+      s.dx = nx - s.x; s.dy = ny - s.y;
+      s.x = nx; s.y = ny;
+    }
+    if (s.crumb) {
+      const c = s.crumb;
+      if (c.state === 'shaking') { c.t += dt; if (c.t >= c.delay) { c.state = 'gone'; c.t = 0; } }
+      else if (c.state === 'gone') { c.t += dt; if (c.t >= c.respawn) { c.state = 'solid'; c.t = 0; } }
+    }
+  }
+  /* ride whatever you are standing on */
+  if (P.riding && P.riding.mov && P.onGround) {
+    P.x += P.riding.dx;
+    P.y += P.riding.dy;
+  }
+}
 function addGround(x, y, w)         { addSolid(x, y, w, 1100, 'rock'); }
 /* spikes: rect is the hit box; dir controls how the teeth are drawn */
 function addSpikes(x, y, w, dir)    { W.spikes.push({ x, y, w, h: 18, dir: dir || 'up' }); }
@@ -674,19 +709,106 @@ function segGauntlet(x, y, d) {
 /* Difficulty is distance/11000 and a metre is 20px, so d = metres / 550.
    minD is the earliest a segment type may appear - techniques arrive in order
    instead of everything being possible from the first screen. */
+/* ---- verticality -------------------------------------------------------
+   A tower of floating platforms zig-zagging upward. Rungs rise 100px, inside a
+   single jump. Missing one drops you back onto the entry floor rather than
+   killing you: the cost is the climb, not the run. Moving and crumbling rungs
+   are mixed in as the course goes on. */
+const MOVER_D = 0.45, CRUMBLE_D = 0.62;
+
+function segClimb(x, y, d) {
+  const w = 430, WALL = 40;
+  const steps = 6 + ri(0, 2) + Math.floor(d * 5);
+  const rise = 100;
+  const topY = y - rise * steps;
+
+  /* Walled like a shaft. Without walls you can drift out of the tower halfway
+     up and end up in the next segment's column, far below its floor, which the
+     fall check reads as having fallen. */
+  addSolid(x, topY - 80, WALL, (y - 62) - (topY - 80), 'rock');   // doorway at the base
+  addSolid(x + w - WALL, topY, WALL, (y + 900) - topY, 'rock');   // its top is the exit
+  addGround(x, y, w);                                             // safe floor to fall back to
+  addBack(x, topY - 80, w, (y + 20) - (topY - 80));
+
+  let side = chance(0.5);
+  for (let i = 1; i <= steps; i++) {
+    const ly = y - rise * i;
+    /* wide rungs keep the diagonal short: the widest gap here is 110px, and a
+       single jump is still 122px up at that distance */
+    const lw = rnd(120, 155);
+    const lx = side ? x + w - WALL - lw : x + WALL;
+    const roll = rnd(0, 1);
+    if (d > CRUMBLE_D && roll < 0.22 && i > 1 && i < steps) addCrumble(lx, ly, lw);
+    else if (d > MOVER_D && roll < 0.5 && i > 1 && i < steps)
+      addMover(lx, ly, lw, 'x', rnd(28, 58), rnd(0.9, 1.5), rnd(0, 6));
+    else addLedge(lx, ly, lw);
+    side = !side;
+  }
+  /* last rung sits against the exit wall so you can step off the top */
+  addLedge(x + w - WALL - 130, topY, 130);
+  return { w, y: topY };
+}
+
+/* ---- getting back down -------------------------------------------------
+   An elevated run whose only way onward is a marked hole in the floor. The far
+   end is walled, so you cannot simply run past it, and the shaft below has
+   staggered ledges - some spiked - to climb down through. Landing at the bottom
+   puts you back on normal ground heading right. */
+function segDropHoles(x, y, d) {
+  const runW = rnd(380, 560);
+  const steps = 2 + ri(0, 1) + (d > 0.6 ? 1 : 0);
+  const drop = steps * 130;
+  const botY = y + drop;
+  const holeW = 100;
+  const holeX = x + rnd(170, runW - 170);
+
+  /* the elevated floor, split by the hole */
+  addSolid(x, y, holeX - x, 26, 'rock');
+  addSolid(holeX + holeW, y, (x + runW) - (holeX + holeW), 26, 'rock');
+  /* wall at the far end: the hole is the way on, not the edge */
+  addSolid(x + runW, y - 210, 34, 236, 'rock');
+  W.drops.push({ x: holeX, y: y, w: holeW, surfY: y });
+
+  /* the shaft under the hole */
+  addBack(holeX - 14, y + 26, holeW + 28, drop + 40);
+  for (let i = 1; i <= steps; i++) {
+    const ly = y + (drop * i) / (steps + 1);
+    const lw = 72;
+    const lx = (i % 2) ? holeX - 6 : holeX + holeW - lw + 6;
+    addLedge(lx, ly, lw);
+    if (d > 0.55 && chance(0.35)) addSpikes(lx + lw * 0.5 - 12, ly - 18, 24, 'up');
+  }
+
+  /* safe ground at the bottom, running right to the exit */
+  addGround(holeX - 40, botY, (x + runW + 150) - (holeX - 40));
+  /* spikes under the approach floor, so the drop reads as a real height */
+  if (holeX - 40 > x + 30) {
+    addSolid(x, botY, (holeX - 40) - x, 900, 'rock');
+    floorSpikes(x + 6, botY, (holeX - 46) - x);
+  }
+  return { w: runW + 150, y: botY };
+}
+
 const POOL = [
   { id: 'flat',  f: segFlat,      w: () => 2.6,               minD: 0 },
   { id: 'gaps',  f: segGaps,      w: () => 2.4,               minD: 0 },
   { id: 'crch',  f: segCrouch,    w: d => 0.7 + 1.6 * d,      minD: 0.06 },  //  33m
   { id: 'pill',  f: segPillars,   w: d => 0.5 + 1.8 * d,      minD: 0.10 },  //  55m
   { id: 'red',   f: segRedlight,  w: d => 0.55 + 1.7 * d,     minD: 0.16 },  //  88m
-  { id: 'up',    f: segShaftUp,   w: d => 0.3 + 1.7 * d,      minD: 0.20 },  // 110m
+  { id: 'up',    f: segShaftUp,   w: d => 0.3 + 1.7 * d,      minD: 0.20, up: 1 },  // 110m
   { id: 'fly',   f: segFlyers,    w: d => 0.25 + 1.5 * d,     minD: 0.26 },  // 143m
-  { id: 'down',  f: segShaftDown, w: d => 0.2 + 1.5 * d,      minD: 0.30 },  // 165m
+  { id: 'down',  f: segShaftDown, w: d => 0.2 + 1.5 * d,      minD: 0.30, up: -1 }, // 165m
   { id: 'turr',  f: segTurrets,   w: d => 0.35 + 1.9 * d,     minD: 0.34 },  // 187m
   { id: 'slsh',  f: segSlash,     w: d => 0.2 + 1.6 * d,      minD: 0.40 },  // 220m
-  { id: 'gaunt', f: segGauntlet,  w: d => 0.35 + 1.7 * d,     minD: 0.46 }   // 253m
+  { id: 'gaunt', f: segGauntlet,  w: d => 0.35 + 1.7 * d,     minD: 0.46 },  // 253m
+  { id: 'climb', f: segClimb,     w: d => 0.9 + 2.2 * d,      minD: 0.22, up: 1 },   // 121m
+  { id: 'holes', f: segDropHoles, w: d => 0.7 + 1.8 * d,      minD: 0.26, up: -1 }   // 143m
 ];
+
+/* How far the course currently sits above where it started. Ascending and
+   descending segments are steered by this so the world cannot climb away
+   forever or sink into the basement. */
+function heightAbove() { return S.startY - W.genY; }
 
 /* No ceiling may hang over a hazard before this point. */
 const CEIL_D = 0.46;
@@ -698,6 +820,7 @@ const CEIL_CLEAR = 180;
 
 const SEG_LABEL = {
   flat: '', gaps: 'CHASM', pill: 'SPIRE FIELD', crch: 'THE CRAWL',
+  climb: 'THE ASCENT', holes: 'THE DROP',
   turr: 'FIRING LINE', up: 'ASCENT', down: 'DESCENT', red: 'WATCHER ZONE',
   fly: 'SWARM', slsh: 'BLADEWORKS', gaunt: 'THE TEETH'
 };
@@ -721,10 +844,14 @@ function generateSeeded() {
   } else if (W.lastType !== 'flat' && chance(0.42)) {
     entry = POOL[0];                                     // breather after anything spicy
   } else {
+    const hi = heightAbove();
     let tot = 0;
     const ws = POOL.map(p => {
       let v = d < p.minD ? 0 : p.w(d);
       if (p.id === W.lastType) v *= 0.15;
+      /* steer the elevation back toward the middle */
+      if (p.up === 1)  v *= hi > 1500 ? 0 : hi > 800 ? 0.25 : hi < 0 ? 2.2 : 1;
+      if (p.up === -1) v *= hi < 200 ? 0.05 : hi > 900 ? 2.6 : 1;
       tot += v; return v;
     });
     let r = rngSrc() * tot;
@@ -795,6 +922,7 @@ function prune(minX) {
   W.enemies = W.enemies.filter(keep);
   W.zones   = W.zones.filter(keep);
   W.backs   = W.backs.filter(keep);
+  W.drops   = W.drops.filter(keep);
   W.segs    = W.segs.filter(s => s.x1 > minX);
   W.bullets = W.bullets.filter(b => b.x > minX && b.life > 0);
 }
@@ -824,7 +952,7 @@ function burst(x, y, n, col, spd, life) {
 function startRun() {
   audioInit();
   W.solids = []; W.spikes = []; W.enemies = []; W.bullets = []; W.zones = []; W.parts = [];
-  W.backs = []; W.segs = []; W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
+  W.backs = []; W.drops = []; W.segs = []; W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
   wstate = WORLD_SEED;                                   // rewind the course
 
   addGround(-600, 0, 700);                                // safe launch pad
@@ -836,7 +964,7 @@ function startRun() {
   P.face = 1; P.run = 0; P.alive = true; P.trail.length = 0;
   SAFE_X = P.x + 950;
 
-  S.mode = 'play'; S.startX = P.x; S.dist = 0; S.maxX = P.x; S.t = 0;
+  S.mode = 'play'; S.startX = P.x; S.startY = 0; S.dist = 0; S.maxX = P.x; S.t = 0;
   S.shake = 0; S.cause = ''; S.deadT = 0; S.litState = 'none'; S.lbl = null;
   S.canRetry = false;
   S.practice = false;
@@ -951,7 +1079,7 @@ function solidsNear(x0, x1) {
   const out = [];
   for (let i = 0; i < W.solids.length; i++) {
     const s = W.solids[i];
-    if (s.x < x1 && s.x + s.w > x0) out.push(s);
+    if (s.x < x1 && s.x + s.w > x0 && solidOn(s)) out.push(s);
   }
   return out;
 }
@@ -1029,11 +1157,15 @@ function physics(dt) {
   const wasAir = !P.onGround;
   P.y += P.vy * dt;
   P.onGround = false;
+  P.riding = null;
   for (const s of near) {
     if (!aabb(P, s)) continue;
     if (s.oneWay) {
-      if (P.vy >= 0 && prevBottom <= s.y + 2) { P.y = s.y - P.h; P.vy = 0; P.onGround = true; }
-    } else if (P.vy > 0) { P.y = s.y - P.h; P.vy = 0; P.onGround = true; }
+      if (P.vy >= 0 && prevBottom <= s.y + 2) {
+        P.y = s.y - P.h; P.vy = 0; P.onGround = true; P.riding = s;
+        if (s.crumb && s.crumb.state === 'solid') { s.crumb.state = 'shaking'; s.crumb.t = 0; }
+      }
+    } else if (P.vy > 0) { P.y = s.y - P.h; P.vy = 0; P.onGround = true; P.riding = s; }
     else if (P.vy < 0)   { P.y = s.y + s.h; P.vy = 0; }
   }
   if (P.onGround) {
@@ -1212,6 +1344,7 @@ function update(dt) {
   S.t += dt;
   P.px = P.x; P.py = P.y;
 
+  updatePlatforms(dt);
   physics(dt);
   updateZones(dt);
   updateEntities(dt);
@@ -1337,6 +1470,38 @@ function bg() {
 function drawSolid(s) {
   const x = s.x, y = s.y, w = s.w, h = Math.min(s.h, viewH + 400);
   if (s.oneWay) {
+    if (s.crumb) {
+      const c = s.crumb;
+      if (c.state === 'gone') {                          // ghost of where it was
+        ctx.save(); ctx.globalAlpha = 0.16;
+        ctx.strokeStyle = '#ffb060'; ctx.lineWidth = 2; ctx.setLineDash([5, 6]);
+        ctx.strokeRect(x, y, w, s.h); ctx.setLineDash([]); ctx.restore();
+        return;
+      }
+      const shake = c.state === 'shaking' ? Math.sin(c.t * 60) * 2.2 : 0;
+      ctx.fillStyle = '#3a2416';
+      ctx.fillRect(x + shake, y, w, s.h);
+      ctx.fillStyle = c.state === 'shaking' ? '#ffb060' : '#c98a4b';
+      ctx.fillRect(x + shake, y, w, 3);
+      ctx.fillStyle = 'rgba(255,176,96,.16)'; ctx.fillRect(x + shake, y + 3, w, 4);
+      /* cracks */
+      ctx.fillStyle = 'rgba(0,0,0,.35)';
+      for (let i = 8; i < w; i += 19) ctx.fillRect(x + i + shake, y + 4, 2, s.h - 5);
+      return;
+    }
+    if (s.mov) {
+      ctx.fillStyle = '#16283f';
+      ctx.fillRect(x, y, w, s.h);
+      ctx.fillStyle = '#66c8ff'; ctx.fillRect(x, y, w, 3);
+      ctx.fillStyle = 'rgba(102,200,255,.16)'; ctx.fillRect(x, y + 3, w, 4);
+      /* direction chevrons so it reads as machinery */
+      ctx.fillStyle = 'rgba(140,215,255,.5)';
+      for (let i = 6; i < w - 8; i += 22) {
+        ctx.fillRect(x + i, y + 8, 8, 2);
+        ctx.fillRect(x + i + (s.dx >= 0 ? 6 : 0), y + 6, 2, 6);
+      }
+      return;
+    }
     ctx.fillStyle = C.ledge; ctx.fillRect(x, y, w, s.h);
     ctx.fillStyle = C.ledgeHi; ctx.fillRect(x, y, w, 3);
     ctx.fillStyle = 'rgba(126,255,208,.14)'; ctx.fillRect(x, y + 3, w, 4);
@@ -1697,6 +1862,31 @@ function render() {
     ctx.fillStyle = sh; ctx.fillRect(b.x, b.y, b.w, Math.min(b.h, 120));
   }
 
+  /* mark the way down: the hole is the safe route, the cliff edges are not */
+  for (const dp of W.drops) {
+    if (dp.x > x1 || dp.x + dp.w < x0) continue;
+    ctx.save();
+    const pulse = 0.45 + 0.3 * Math.sin(S.t * 3.4);
+    ctx.strokeStyle = 'rgba(126,255,208,' + pulse.toFixed(2) + ')';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(dp.x, dp.surfY - 2); ctx.lineTo(dp.x, dp.surfY + 26);
+    ctx.moveTo(dp.x + dp.w, dp.surfY - 2); ctx.lineTo(dp.x + dp.w, dp.surfY + 26);
+    ctx.stroke();
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = '#7effd0';
+    for (let k = 0; k < 3; k++) {                        // downward chevrons
+      const cy = dp.surfY + 34 + k * 16;
+      ctx.beginPath();
+      ctx.moveTo(dp.x + dp.w / 2 - 11, cy);
+      ctx.lineTo(dp.x + dp.w / 2, cy + 9);
+      ctx.lineTo(dp.x + dp.w / 2 + 11, cy);
+      ctx.lineTo(dp.x + dp.w / 2, cy + 4);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   for (const z of W.zones) if (z.x < x1 && z.x + z.w > x0) drawZone(z);
 
   for (const s of W.solids) {
@@ -1780,7 +1970,7 @@ function frame(now) {
 function bootScene() {
   /* a quiet idle world behind the menu */
   W.solids = []; W.spikes = []; W.enemies = []; W.bullets = []; W.zones = []; W.parts = [];
-  W.backs = []; W.segs = []; W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
+  W.backs = []; W.drops = []; W.segs = []; W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
   addGround(-800, 0, 3600);
   W.segs.push({ x0: -800, x1: 2800, killY: 980, id: 'flat' });
   W.genX = 2800; W.genY = 0;
