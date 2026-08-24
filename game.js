@@ -337,6 +337,8 @@ window.addEventListener('keydown', e => {
   audioInit();
   if (keyFlag(e.code, true)) e.preventDefault();
   if (e.code === 'KeyM') setMute(!muted);
+  if (REC.playing && (e.code === 'KeyR' || e.code === 'Space' || e.code === 'Enter' ||
+                      e.code === 'Escape')) { endReplay(); return; }
   if (e.code === 'KeyR' && (S.mode === 'play' || S.mode === 'dead')) startRun();
   if (e.code === 'Space' || e.code === 'Enter') {
     if (S.mode === 'menu') startRun();
@@ -1152,6 +1154,12 @@ const P = { x: 0, y: 0, vx: 0, vy: 0, w: PW, h: PH, crouch: false, onGround: fal
 const S = { mode: 'menu', startX: 0, best: 0, dist: 0, maxX: 0, t: 0,
             shake: 0, cause: '', deadT: 0, litState: 'none' };
 
+/* Replay. The course is seeded and the simulation is deterministic given the
+   same inputs, so a run is fully described by one byte of input per physics
+   step - about 7KB a minute. Playing it back re-runs the real game rather than
+   animating a recording, so what you watch is exactly what happened. */
+const REC = { tape: [], playing: false, i: 0, dist: 0, cause: '', cap: 120 * 600 };
+
 const cam = { x: 0, y: 0, sx: 0, sy: 0 };
 /* The wall no longer advances on its own. It only gains speed while you are not
    making progress, and that speed bleeds away again over 100m of running. The
@@ -1173,10 +1181,12 @@ function burst(x, y, n, col, spd, life) {
 }
 
 /* ------------------------------ run control ---------------------------- */
-function startRun() {
+function startRun(isReplay) {
   audioInit();
   goFullscreen();
   releaseAllTouch();
+  if (isReplay) { REC.playing = true; REC.i = 0; }
+  else { REC.tape.length = 0; REC.playing = false; }
   W.solids = []; W.spikes = []; W.enemies = []; W.bullets = []; W.zones = []; W.parts = [];
   W.backs = []; W.drops = []; W.segs = []; W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
   wstate = WORLD_SEED;                                   // rewind the course
@@ -1197,6 +1207,7 @@ function startRun() {
   S.shake = 0; S.cause = ''; S.deadT = 0; S.litState = 'none'; S.lbl = null;
   S.canRetry = false;
   S.practice = false;
+  if (!isReplay) REC.saved = false;
   jumpPressed = false;                                   // drop any stale buffered press
   $('zone').textContent = '';
   storm.x = P.x - STORM_TRAIL; storm.v = 0; storm.boost = 0; storm.flash = 0;
@@ -1213,6 +1224,7 @@ function startRun() {
   $('menu').classList.add('hidden');  $('menu').classList.remove('on');
   $('death').classList.add('hidden'); $('death').classList.remove('on');
   $('hud').classList.remove('hidden');
+  $('replayTag').classList.toggle('hidden', !REC.playing);
   $('lightBox').classList.remove('on');
   fadeOut();
 }
@@ -1228,7 +1240,25 @@ function die(cause) {
   sfx.die();
   burst(P.x + P.w / 2, P.y + P.h / 2, 34, '#ff5a70', 460, 0.9);
   burst(P.x + P.w / 2, P.y + P.h / 2, 18, '#ffd166', 300, 0.7);
+  if (REC.playing) {
+    /* a replay usually ends by dying at the same spot, not by running out of
+       tape, so close it out here too */
+    REC.playing = false;
+    $('replayTag').classList.add('hidden');
+    S.dist = REC.dist; S.cause = REC.cause;
+  } else { REC.dist = S.dist; REC.cause = cause; }
   setTimeout(showDeath, 820);
+}
+
+/* Reaching the end of the tape without dying (or being skipped) still lands on
+   the same end screen the run finished with. */
+function endReplay() {
+  REC.playing = false;
+  S.mode = 'dead'; S.deadT = 0;
+  S.dist = REC.dist; S.cause = REC.cause;
+  musicStop();
+  $('replayTag').classList.add('hidden');
+  showDeath();
 }
 
 /* ------------------------------ high scores ---------------------------- */
@@ -1262,7 +1292,7 @@ function showDeath() {
   $('newRec').style.display = (!S.practice && sc > prevBest && sc > 0) ? 'block' : 'none';
 
   const list = loadScores();
-  const qualifies = !S.practice && sc > 0 &&
+  const qualifies = !S.practice && sc > 0 && !REC.saved &&
                     (list.length < 10 || sc > list[list.length - 1].s);
   pendingScore = -1;
   if (qualifies) {
@@ -1272,6 +1302,7 @@ function showDeath() {
   } else {
     $('nameRow').style.display = 'none';
   }
+  $('replayBtn').classList.toggle('hidden', REC.tape.length < 60);
   renderScores($('dScores'), null);
   $('death').classList.remove('hidden'); $('death').classList.add('on');
   $('hud').classList.add('hidden');
@@ -1287,6 +1318,7 @@ function commitScore() {
   const idx = a.findIndex(r => r.s === pendingScore && r.n === n);
   saveScores(a);
   pendingScore = -1;
+  REC.saved = true;
   $('nameRow').style.display = 'none';
   renderScores($('dScores'), idx < 10 ? idx : null);
   $('best').textContent = 'BEST ' + bestScore();
@@ -1303,6 +1335,7 @@ $('menuBtn').onclick  = () => {
   renderScores($('scores'), null);
 };
 $('saveBtn').onclick = () => commitScore();
+$('replayBtn').onclick = () => { commitScore(); startRun(true); };
 $('nameIn').addEventListener('keydown', e => { if (e.key === 'Enter') commitScore(); });
 
 /* ------------------------------ physics -------------------------------- */
@@ -1641,6 +1674,16 @@ function update(dt) {
     camFollow(dt);
     return;
   }
+  if (REC.playing) {
+    if (REC.i >= REC.tape.length) { endReplay(); return; }
+    const b = REC.tape[REC.i++];
+    K.left = !!(b & 1); K.right = !!(b & 2); K.down = !!(b & 4);
+    jumpPressed = !!(b & 8); jumpHeld = !!(b & 16); downPressed = !!(b & 32);
+  } else if (REC.tape.length < REC.cap) {
+    REC.tape.push((K.left ? 1 : 0) | (K.right ? 2 : 0) | (K.down ? 4 : 0) |
+                  (jumpPressed ? 8 : 0) | (jumpHeld ? 16 : 0) | (downPressed ? 32 : 0));
+  }
+
   S.t += dt;
   P.px = P.x; P.py = P.y;
 
@@ -2415,7 +2458,7 @@ function bootScene() {
 }
 bootScene();
 if (typeof window !== 'undefined' && window.__RLR_DEBUG) {
-  window.__RLR = { W, P, S, cam, storm, K, MUS, startRun, update, render, generate,
+  window.__RLR = { W, P, S, cam, storm, K, MUS, REC, startRun, update, render, generate,
     music: () => ({ on: MUS.on, bpm: +MUS.bpm.toFixed(1), target: +MUS.targetBpm.toFixed(1),
                     inten: +MUS.inten.toFixed(3), hush: MUS.hush, step: MUS.step,
                     cutoff: musFilter ? Math.round(musFilter.frequency.value) : null,

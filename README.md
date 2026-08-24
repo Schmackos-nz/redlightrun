@@ -75,6 +75,16 @@ Two things worth knowing if you touch this:
   Driving an `AudioParam` at 120Hz piles up an automation event every 8ms and the
   filter never actually travels.
 
+## Replay
+
+WATCH REPLAY on the death screen plays your last attempt back in full, then
+lands on the same end screen. It records **one byte of input per physics step**
+(~7KB a minute, capped at ten minutes) and plays it back by re-running the real
+simulation, rather than animating a recording - so what you watch is exactly what
+happened, not an approximation. That only works because the course is seeded and
+the sim is deterministic; verified frame-for-frame over a 948-step run with live
+input deliberately jammed during playback. Any key skips.
+
 ## Level generation
 
 The world is streamed in segments about 2600px ahead of the player and pruned

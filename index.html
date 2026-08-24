@@ -29,6 +29,11 @@
   #dist{font-size:34px;font-weight:800;text-shadow:0 0 18px rgba(120,180,255,.55);line-height:1}
   #distLbl{font-size:11px;opacity:.5;letter-spacing:.28em;margin-top:3px}
   #best{font-size:13px;opacity:.55;text-align:right;letter-spacing:.14em}
+  #replayTag{position:absolute;left:50%;top:96px;transform:translateX(-50%);
+    font-size:10px;font-weight:800;letter-spacing:.26em;color:#8fe6ff;
+    background:rgba(8,14,28,.75);border:1px solid rgba(120,200,255,.4);
+    border-radius:999px;padding:5px 14px;white-space:nowrap;
+    animation:pulse 1.1s infinite alternate}
   #practice{margin-top:8px;font-size:10px;font-weight:800;letter-spacing:.22em;
     color:#ffc043;background:rgba(255,192,67,.12);border:1px solid rgba(255,192,67,.35);
     border-radius:999px;padding:4px 10px;display:inline-block}
@@ -210,6 +215,7 @@
       <div id="chaseEnds"><span>100 M</span><span>0 M</span></div>
     </div>
     <div id="lightBox"><div id="lamp"></div><div id="lightTxt">WATCHING</div></div>
+    <div id="replayTag" class="hidden">&#9654; REPLAY &middot; ANY KEY TO SKIP</div>
   </div>
 
   <div id="menu" class="layer on">
@@ -271,6 +277,7 @@
       <div id="nameRow"><input id="nameIn" maxlength="3" placeholder="AAA" autocomplete="off"><button class="btn" id="saveBtn" style="margin-top:0">SAVE</button></div>
       <div>
         <button class="btn" id="againBtn">RUN AGAIN <span style="opacity:.55;font-size:11px">SPACE</span></button>
+        <button class="btn ghost" id="replayBtn">&#9654; WATCH REPLAY</button>
         <button class="btn ghost" id="menuBtn">MENU</button>
       </div>
       <div id="dScores" class="scores"></div>
