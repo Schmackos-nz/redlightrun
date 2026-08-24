@@ -86,7 +86,7 @@ function resize() {
   viewH = VIEW_H;
   viewW = CSSW / SC;
 }
-window.addEventListener('resize', resize);
+window.addEventListener('resize', () => { resize(); if (typeof checkOrientation === 'function') checkOrientation(); });
 resize();
 
 /* ------------------------------ audio ---------------------------------- */
@@ -324,25 +324,85 @@ window.addEventListener('keydown', e => {
   }
 });
 window.addEventListener('keyup', e => { if (keyFlag(e.code, false)) e.preventDefault(); });
-window.addEventListener('blur', () => { K.left = K.right = K.up = K.down = false; jumpHeld = false; });
+window.addEventListener('blur', () => {
+  K.left = K.right = K.up = K.down = false; jumpHeld = false;
+  if (typeof releaseAllTouch === 'function') releaseAllTouch();
+});
 
-/* touch */
+/* ------------------------------ touch ---------------------------------- */
+/* ?touch forces the mobile scheme on so the layout can be checked on a desktop */
+const FORCE_TOUCH = typeof location !== 'undefined' && !!location.search &&
+                    location.search.indexOf('touch') >= 0;
+const IS_TOUCH = FORCE_TOUCH ||
+                 (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ||
+                 ('ontouchstart' in window && navigator.maxTouchPoints > 0);
 const touchEl = $('touch');
-if ('ontouchstart' in window || navigator.maxTouchPoints > 0) touchEl.classList.add('on');
-function bindTouch(el, on, off) {
-  const set = (v, e) => {
-    e.preventDefault(); audioInit();
-    el.classList.toggle('act', v);
-    v ? on() : off();
-  };
-  el.addEventListener('touchstart', e => set(true, e), { passive: false });
-  el.addEventListener('touchend',   e => set(false, e), { passive: false });
-  el.addEventListener('touchcancel', e => set(false, e), { passive: false });
+if (IS_TOUCH) touchEl.classList.add('on');
+
+/* One global tracker rather than per-button listeners: it handles several
+   fingers at once, and sliding a thumb from one pad to another hands over
+   cleanly instead of leaving the first stuck down. */
+const ZONES = [];
+function zone(id, on, off) { ZONES.push({ el: $(id), on, off, active: false }); }
+zone('tL', () => K.left = true,  () => K.left = false);
+zone('tR', () => K.right = true, () => K.right = false);
+zone('tC', () => K.down = true,  () => K.down = false);
+zone('tJ', () => { jumpPressed = true; jumpHeld = true; }, () => { jumpHeld = false; });
+
+function releaseAllTouch() {
+  for (const z of ZONES) {
+    if (!z.active) continue;
+    z.active = false; z.el.classList.remove('act'); z.off();
+  }
 }
-bindTouch($('tL'), () => K.left = true,  () => K.left = false);
-bindTouch($('tR'), () => K.right = true, () => K.right = false);
-bindTouch($('tC'), () => K.down = true,  () => K.down = false);
-bindTouch($('tJ'), () => { jumpPressed = true; jumpHeld = true; }, () => { jumpHeld = false; });
+function syncTouches(e) {
+  const pressed = new Set();
+  const pad = 12;                                        // forgiving edges
+  for (let i = 0; i < e.touches.length; i++) {
+    const t = e.touches[i];
+    for (const z of ZONES) {
+      const r = z.el.getBoundingClientRect();
+      if (t.clientX >= r.left - pad && t.clientX <= r.right + pad &&
+          t.clientY >= r.top - pad && t.clientY <= r.bottom + pad) { pressed.add(z); break; }
+    }
+  }
+  for (const z of ZONES) {
+    const now = pressed.has(z);
+    if (now === z.active) continue;
+    z.active = now;
+    z.el.classList.toggle('act', now);
+    (now ? z.on : z.off)();
+  }
+}
+function onTouch(e) {
+  if (!IS_TOUCH) return;
+  if (S.mode !== 'play') return;      /* menus keep normal taps and scrolling */
+  e.preventDefault();
+  audioInit();
+  syncTouches(e);
+}
+for (const ev of ['touchstart', 'touchmove', 'touchend', 'touchcancel'])
+  window.addEventListener(ev, onTouch, { passive: false });
+
+/* ---- fullscreen and orientation ---- */
+function goFullscreen() {
+  if (!IS_TOUCH) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+  if (req && !(document.fullscreenElement || document.webkitFullscreenElement)) {
+    try { const r = req.call(el, { navigationUI: 'hide' }); if (r && r.catch) r.catch(() => {}); }
+    catch (e) { try { req.call(el); } catch (e2) {} }
+  }
+  const so = window.screen && screen.orientation;
+  if (so && so.lock) { try { const r = so.lock('landscape'); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
+}
+/* Portrait on a phone shows almost none of the course, so ask for a turn. */
+function checkOrientation() {
+  const portrait = window.innerHeight > window.innerWidth;
+  $('rotate').classList.toggle('on', IS_TOUCH && portrait);
+}
+window.addEventListener('orientationchange', () => setTimeout(() => { resize(); checkOrientation(); }, 250));
+checkOrientation();
 
 /* ------------------------------ world ---------------------------------- */
 const W = {
@@ -951,6 +1011,8 @@ function burst(x, y, n, col, spd, life) {
 /* ------------------------------ run control ---------------------------- */
 function startRun() {
   audioInit();
+  goFullscreen();
+  releaseAllTouch();
   W.solids = []; W.spikes = []; W.enemies = []; W.bullets = []; W.zones = []; W.parts = [];
   W.backs = []; W.drops = []; W.segs = []; W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
   wstate = WORLD_SEED;                                   // rewind the course
@@ -994,6 +1056,7 @@ function die(cause) {
   P.alive = false; S.mode = 'dead'; S.cause = cause; S.deadT = 0; S.shake = 26;
   redFreeze = false;
   musicStop();
+  releaseAllTouch();
   sfx.die();
   burst(P.x + P.w / 2, P.y + P.h / 2, 34, '#ff5a70', 460, 0.9);
   burst(P.x + P.w / 2, P.y + P.h / 2, 18, '#ffd166', 300, 0.7);

@@ -20,7 +20,17 @@ fixed) course.
 | `R` | restart | 
 | `M` | mute |
 
-Touch controls appear automatically on touch devices.
+## On a phone
+
+Touch controls appear automatically on any coarse-pointer device: two movement
+pads under the left thumb, JUMP and DUCK under the right. A single global touch
+tracker handles them rather than per-button listeners, so several fingers work at
+once and sliding a thumb from one pad to another hands over cleanly instead of
+leaving the first stuck down. Starting a run requests fullscreen and tries to
+lock landscape; in portrait the game asks you to turn the phone, because a
+side-scroller in portrait shows almost none of the course.
+
+Append `?touch` to force the mobile scheme on a desktop for layout checks.
 
 ## Rules
 
@@ -67,7 +77,28 @@ flat breather inserted after most hard segments:
 
 `flat` `gaps` `pill` (spire field) `crch` (crouch tunnels) `turr` (firing line)
 `up` / `down` (vertical shafts over spike floors) `red` (watcher zone)
-`fly` `slsh` (bladeworks) `gaunt` (spike teeth)
+`fly` `slsh` (bladeworks) `gaunt` (spike teeth) `climb` (the ascent)
+`holes` (the drop)
+
+### Verticality
+
+`climb` is a walled tower of 6-13 floating rungs zig-zagging upward, up to
+1200px tall. Rungs rise 100px and are wide enough that the diagonal is 110px at
+worst, where a single jump is still 122px up. Missing one drops you onto a safe
+floor at the base: the cost is the climb, not the run.
+
+`holes` is an elevated run whose only way onward is a marked hole in the floor,
+with the far end walled so you cannot run past it.
+
+Two platform kinds appear as the course goes on. **Movers** (from 247m) slide
+along one axis and carry their rider. **Crumblers** (from 341m) shake for half a
+second when you land, give way, then return 2.6s later.
+
+Ascending and descending segments are steered by how far the course sits above
+its start, so elevation cannot run away; over 400 segments it stays within
+-800..2670px. Towers are walled for a reason: without walls you can drift out
+sideways halfway up into the next segment's column, far below its floor, which
+the fall check reads as a fall.
 
 Each type has a `minD` unlock so techniques arrive in order rather than
 everything being possible on the first screen (d = metres / 550):

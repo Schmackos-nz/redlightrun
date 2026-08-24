@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#05060d">
 <title>REDLIGHT RUN</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -109,17 +113,41 @@
   .empty{font-size:12px;opacity:.35;padding:10px}
 
   /* ---------- Touch ---------- */
-  #touch{position:absolute;inset:0;display:none;pointer-events:none}
+  #touch{position:absolute;inset:0;display:none;pointer-events:none;
+    padding:0 max(14px,env(safe-area-inset-left)) max(14px,env(safe-area-inset-bottom))
+            max(14px,env(safe-area-inset-right))}
   #touch.on{display:block}
-  .tb{position:absolute;pointer-events:auto;border-radius:50%;
-    background:rgba(180,205,255,.1);border:1px solid rgba(180,205,255,.22);
-    display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;
-    color:rgba(230,240,255,.65)}
-  .tb.act{background:rgba(120,200,255,.3)}
-  #tL{left:20px;bottom:26px;width:78px;height:78px}
-  #tR{left:112px;bottom:26px;width:78px;height:78px}
-  #tJ{right:20px;bottom:26px;width:92px;height:92px}
-  #tC{right:126px;bottom:30px;width:74px;height:74px}
+  .tb{position:absolute;border-radius:50%;
+    background:rgba(180,205,255,.09);border:2px solid rgba(180,205,255,.24);
+    display:flex;align-items:center;justify-content:center;
+    font-size:26px;font-weight:800;color:rgba(230,240,255,.62);
+    box-shadow:0 6px 22px rgba(0,0,0,.35);transition:background .06s,transform .06s}
+  .tb.act{background:rgba(120,200,255,.34);border-color:rgba(150,220,255,.6);
+    color:#eaf7ff;transform:scale(.94)}
+  .tb small{font-size:9px;letter-spacing:.14em;opacity:.6;position:absolute;bottom:9px}
+  /* left thumb: movement.  right thumb: jump and crouch. */
+  #tL{left:max(16px,env(safe-area-inset-left));bottom:22px;width:88px;height:88px}
+  #tR{left:calc(max(16px,env(safe-area-inset-left)) + 100px);bottom:22px;width:88px;height:88px}
+  #tJ{right:max(16px,env(safe-area-inset-right));bottom:22px;width:112px;height:112px;font-size:32px}
+  #tC{right:calc(max(16px,env(safe-area-inset-right)) + 124px);bottom:22px;width:88px;height:88px}
+  @media (max-height:420px){
+    .tb{box-shadow:none}
+    #tL,#tR,#tC{width:76px;height:76px}
+    #tJ{width:96px;height:96px}
+    #tR{left:calc(max(16px,env(safe-area-inset-left)) + 86px)}
+    #tC{right:calc(max(16px,env(safe-area-inset-right)) + 106px)}
+  }
+
+  /* ---------- Rotate prompt ---------- */
+  #rotate{position:absolute;inset:0;display:none;z-index:40;
+    background:#05060d;color:#dfe6ff;
+    align-items:center;justify-content:center;flex-direction:column;gap:18px;text-align:center;padding:30px}
+  #rotate.on{display:flex}
+  #rotate .ph{width:64px;height:104px;border:3px solid rgba(160,200,255,.6);border-radius:12px;
+    animation:tip 1.6s ease-in-out infinite}
+  @keyframes tip{0%,40%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+  #rotate .rt{font-size:14px;letter-spacing:.22em;font-weight:800;opacity:.85}
+  #rotate .rs{font-size:12px;opacity:.5;letter-spacing:.1em}
 
   #fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;
     transition:opacity .18s}
@@ -217,8 +245,14 @@
   <div id="touch">
     <div class="tb" id="tL">&#9664;</div>
     <div class="tb" id="tR">&#9654;</div>
-    <div class="tb" id="tC">&#9660;</div>
-    <div class="tb" id="tJ">&#9650;</div>
+    <div class="tb" id="tC">&#9660;<small>DUCK</small></div>
+    <div class="tb" id="tJ">&#9650;<small>JUMP</small></div>
+  </div>
+
+  <div id="rotate">
+    <div class="ph"></div>
+    <div class="rt">TURN YOUR PHONE</div>
+    <div class="rs">Redlight Run is played sideways</div>
   </div>
 
   <div id="fade"></div>
