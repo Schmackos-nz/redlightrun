@@ -13,9 +13,10 @@ fixed) course.
 | Key | Action |
 | --- | --- |
 | `A` / `D` or arrows | move |
-| `SPACE` / `W` / `UP` | jump, press again in mid-air to double jump |
+| `SPACE` / `W` / `UP` | jump - release early to hop, **hold at the top to charge higher** |
 | `S` / `DOWN` | crouch (slide under low ceilings, duck high bullets) |
 | `S` + jump | crouch jump: a low, flat hop (51px up, 106px across) |
+| `S` in mid-air | dive: straight back down at 900px/s, keeping your direction |
 | `SPACE` | on the death screen, run again |
 | `R` | restart | 
 | `M` | mute |
@@ -170,8 +171,11 @@ Append `?dev` to the URL to expose `window.__RLR` (world, player, state, and a
 
 Measured from the real physics, not assumed:
 
-- top speed 330 px/s, single jump lifts the feet 120px and carries 195px
-- double jump lifts the feet 228px and carries 327px
+- top speed 330 px/s, plain jump lifts the feet 120px and carries 195px
+- charge jump lifts the feet 228px and carries 360px (there is no double jump;
+  holding at the apex is the only way to go high, and it is always available)
+- lava fills some ground openings instead of spikes: same depth and lethality,
+  so nothing about the jump geometry changes
 - standing box 26x46, crouched 26x24
 
 Generation is capped against those numbers: obstacles never exceed 210px, pits

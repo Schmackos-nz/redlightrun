@@ -52,23 +52,19 @@ const chaseSkull = $('chaseSkull'), chaseFill = $('chaseFill');
 const PPM        = 20;      // pixels per "metre" of score
 const GRAV       = 2600;
 const MAX_FALL   = 1500;
-const JUMP_V     = 800;     // single jump apex ~123px, double ~245px
+const JUMP_V     = 800;     // apex 120px; hold at the top to charge on up to 228
 const CROUCH_JUMP_V = 528;  // low hop: ~54px, fits a crouched player under a 150 ceiling
 /* Charge jump. It kicks in when you are STILL HOLDING jump at the top of a
    normal jump - an input that otherwise does nothing - so it never delays a
    normal jump, which has to stay instant because short hops depend on releasing
    early. From there you keep rising while you hold, and let go when you like:
-   a brief hold is a little above a normal jump, a full hold reaches 228, which
-   is exactly double-jump height. The double jump itself is untouched. */
+   a brief hold is a little above a plain jump, a full hold reaches 228. It is
+   always available: there is no double jump and nothing to spend. */
 const LIFT_SPEED = 300;     // px/s of hold-to-rise
-const LIFT_BUDGET = 108;    // 120 (normal apex) + 108 = 228, a double jump
-const LIFT_COMMIT = 18;     // lift under this is free: a stray hold costs nothing
+const LIFT_BUDGET = 108;    // 120 (apex) + 108 = 228 total
 /* Tapping crouch in mid-air drops you out of the sky, keeping whatever
    direction the jump had. */
 const DIVE_V = 900;
-const CHARGE_MAX = 2;
-const CHARGE_REFILL = 5.5;  // seconds per use
-const DBL_V      = 760;
 const RUN_SPEED  = 330;
 const CROUCH_SPD = 155;
 const ACC_GROUND = 3400;
@@ -301,7 +297,6 @@ function musicTick() {
 
 const sfx = {
   jump:  () => tone(430, 0.13, 'square', 0.16, 780),
-  dbl:   () => tone(660, 0.15, 'triangle', 0.16, 1120),
   land:  () => noise(0.07, 0.10, 700),
   shoot: () => tone(220, 0.07, 'sawtooth', 0.09, 90),
   green: () => { tone(560, 0.10, 'sine', 0.18); setTimeout(() => tone(840, 0.14, 'sine', 0.16), 90); },
@@ -311,8 +306,7 @@ const sfx = {
   mark:  () => tone(1050, 0.09, 'sine', 0.10, 1400),
   lob:   () => { tone(150, 0.16, 'sine', 0.16, 320); noise(0.1, 0.07, 600); },
   charge: () => { tone(520, 0.2, 'sawtooth', 0.15, 1180); noise(0.09, 0.05, 3000); },
-  dive:  () => { tone(700, 0.14, 'square', 0.13, 190); noise(0.08, 0.06, 1600); },
-  recharge: () => tone(880, 0.08, 'sine', 0.07, 1240)
+  dive:  () => { tone(700, 0.14, 'square', 0.13, 190); noise(0.08, 0.06, 1600); }
 };
 
 /* ------------------------------ input ---------------------------------- */
@@ -431,7 +425,7 @@ checkOrientation();
 /* ------------------------------ world ---------------------------------- */
 const W = {
   solids: [], spikes: [], enemies: [], bullets: [], zones: [], parts: [], backs: [],
-  drops: [], segs: [], genX: 0, genY: 0, lastType: '', n: 0
+  drops: [], lava: [], segs: [], genX: 0, genY: 0, lastType: '', n: 0
 };
 
 /* nothing that can kill you on its own spawns before this world x */
@@ -502,10 +496,16 @@ function addGround(x, y, w)         { addSolid(x, y, w, 1100, 'rock'); }
 /* spikes: rect is the hit box; dir controls how the teeth are drawn */
 function addSpikes(x, y, w, dir)    { W.spikes.push({ x, y, w, h: 18, dir: dir || 'up' }); }
 function floorSpikes(x, surfY, w)   { addSpikes(x, surfY - 18, w, 'up'); }
-function pit(x, surfY, w) {           // bottomless-looking gap with spikes at the bottom
+/* Lava fills the bottom of an opening instead of spikes. Same lethality and the
+   same depth, so nothing about the jump geometry changes - it just reads as a
+   different kind of death, and only where the ground genuinely opens up. */
+function addLava(x, y, w) { W.lava.push({ x, y, w, h: 64, t: rnd(0, 6) }); }
+
+function pit(x, surfY, w) {           // an opening in the ground: spikes or lava below
   const fy = surfY + 240;
   addSolid(x, fy, w, 900, 'rock');
-  floorSpikes(x + 4, fy, w - 8);
+  if (w > 120 && chance(0.34)) addLava(x + 3, fy - 20, w - 6);
+  else floorSpikes(x + 4, fy, w - 8);
 }
 
 function walker(x, surfY, minX, maxX) {
@@ -1097,24 +1097,33 @@ function startAtMetres(metres) {
   for (const sg of W.segs) if (sg.x1 > targetX) { seg = sg; break; }
   if (!seg) return;
 
-  /* walk forward from the segment start until the spawn box stands on solid
-     ground and is clear of spikes and anything alive */
-  let px = seg.x0 + 24, surfY = null;
-  for (let tries = 0; tries < 80; tries++, px += 24) {
+  /* Land on the safe spot NEAREST the requested distance, searching outward in
+     both directions. Always taking the segment start put you up to 1400px short
+     whenever the target fell inside a long segment. */
+  function safeAt(px) {
     let top = null;
+    const cx = px + PW / 2;
     for (const s of W.solids) {
       if (s.oneWay || s.kind === 'slab') continue;
-      if (px < s.x || px + PW > s.x + s.w) continue;
+      if (cx < s.x || cx > s.x + s.w) continue;
       if (top === null || s.y < top) top = s.y;
     }
-    if (top === null) continue;
+    if (top === null) return null;
     const box = { x: px, y: top - PH, w: PW, h: PH };
-    let clear = true;
-    for (const sp of W.spikes) if (aabb(box, sp)) { clear = false; break; }
-    if (clear) for (const e of W.enemies) {
-      if (e.type !== 'turret' && aabb(box, e)) { clear = false; break; }
+    for (const sp of W.spikes) if (aabb(box, sp)) return null;
+    for (const l of W.lava) if (aabb(box, l)) return null;
+    for (const e of W.enemies) if (e.type !== 'turret' && aabb(box, e)) return null;
+    return top;
+  }
+
+  let px = 0, surfY = null;
+  for (let off = 0; off <= 1600 && surfY === null; off += 24) {
+    for (const dir of (off === 0 ? [0] : [1, -1])) {
+      const cand = targetX + dir * off;
+      if (cand < S.startX + 200) continue;
+      const top = safeAt(cand);
+      if (top !== null) { px = cand; surfY = top; break; }
     }
-    if (clear) { surfY = top; break; }
   }
   if (surfY === null) return;
 
@@ -1140,6 +1149,7 @@ function prune(minX) {
   W.enemies = W.enemies.filter(keep);
   W.zones   = W.zones.filter(keep);
   W.backs   = W.backs.filter(keep);
+  W.lava    = W.lava.filter(keep);
   W.drops   = W.drops.filter(keep);
   W.segs    = W.segs.filter(s => s.x1 > minX);
   W.bullets = W.bullets.filter(b => b.x > minX && b.life > 0);
@@ -1148,8 +1158,7 @@ function prune(minX) {
 /* ------------------------------ player --------------------------------- */
 const P = { x: 0, y: 0, vx: 0, vy: 0, w: PW, h: PH, crouch: false, onGround: false,
             jumps: 0, coyote: 0, buffer: 0, face: 1, run: 0, alive: true, trail: [],
-            charges: CHARGE_MAX, refill: 0, charged: false, riding: null,
-            lift: 0, liftUsed: false, liftDone: 0 };
+            charged: false, riding: null, lift: 0 };
 
 const S = { mode: 'menu', startX: 0, best: 0, dist: 0, maxX: 0, t: 0,
             shake: 0, cause: '', deadT: 0, litState: 'none' };
@@ -1188,7 +1197,8 @@ function startRun(isReplay) {
   if (isReplay) { REC.playing = true; REC.i = 0; }
   else { REC.tape.length = 0; REC.playing = false; }
   W.solids = []; W.spikes = []; W.enemies = []; W.bullets = []; W.zones = []; W.parts = [];
-  W.backs = []; W.drops = []; W.segs = []; W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
+  W.backs = []; W.drops = []; W.lava = []; W.segs = [];
+  W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
   wstate = WORLD_SEED;                                   // rewind the course
 
   addGround(-600, 0, 700);                                // safe launch pad
@@ -1199,8 +1209,7 @@ function startRun(isReplay) {
   P.crouch = false; P.onGround = true; P.jumps = 0; P.coyote = 0; P.buffer = 0;
   P.face = 1; P.run = 0; P.alive = true; P.trail.length = 0;
   downPressed = false;
-  P.charges = CHARGE_MAX; P.refill = 0; P.charged = false; P.riding = null;
-  P.lift = 0; P.liftUsed = false; P.liftDone = 0;
+  P.charged = false; P.riding = null; P.lift = 0;
   SAFE_X = P.x + 950;
 
   S.mode = 'play'; S.startX = P.x; S.startY = 0; S.dist = 0; S.maxX = P.x; S.t = 0;
@@ -1400,14 +1409,6 @@ function physics(dt) {
       P.jumps = 1; P.buffer = 0; P.coyote = 0; P.onGround = false;
       sfx.jump();
       for (let i = 0; i < 7; i++) part(P.x + P.w / 2 + rnd(-9, 9), P.y + P.h, rnd(-70, 70), rnd(-30, 60), 0.35, '#7fe4ff', 2.6);
-    } else if (P.jumps < 2) {
-      P.vy = -(P.crouch ? DBL_V * 0.72 : DBL_V); P.jumps = 2; P.buffer = 0;
-      sfx.dbl();
-      for (let i = 0; i < 14; i++) {
-        const a = Math.PI * (0.15 + Math.random() * 0.7);
-        part(P.x + P.w / 2, P.y + P.h - 4, Math.cos(a) * rnd(60, 190) * (chance(0.5) ? 1 : -1),
-             Math.sin(a) * rnd(40, 140), 0.42, '#b98cff', 3);
-      }
     }
   }
   /* ---- charge jump ---- */
@@ -1415,10 +1416,10 @@ function physics(dt) {
      available off a double jump, only in addition to one */
   /* Not off a crouch hop: that hop exists to stay LOW under a tight ceiling, and
      lifting it to 159px would defeat the one thing it is for. */
-  if (jumpHeld && !P.onGround && !P.crouch && !P.charged &&
-      P.jumps === 1 && P.vy >= 0 && P.charges > 0) {
+  if (jumpHeld && !P.onGround && !P.crouch && !P.charged && P.jumps === 1 && P.vy >= 0) {
     P.charged = true;                                    // one lift per time airborne
-    P.lift = LIFT_BUDGET; P.liftUsed = false; P.liftDone = 0;
+    P.lift = LIFT_BUDGET;
+    sfx.charge();
   }
   if (P.lift > 0) {
     if (!jumpHeld || P.onGround) { P.lift = 0; }         // let go and you stop rising
@@ -1428,11 +1429,8 @@ function physics(dt) {
          the budget is partly spent, and holding full speed there coasts you
          past the cap (236 instead of 228) */
       P.vy = -(rise / dt) - GRAV * dt;   // gravity lands after this; aim above it
-      P.lift -= rise; P.liftDone += rise;
-      if (!P.liftUsed && P.liftDone >= LIFT_COMMIT) {
-        P.liftUsed = true; P.charges--; P.refill = 0; sfx.charge();
-      }
-      if (P.liftUsed && chance(0.55))
+      P.lift -= rise;
+      if (chance(0.55))
         part(P.x + P.w / 2 + rnd(-8, 8), P.y + P.h, rnd(-70, 70), rnd(70, 170), 0.35, '#ffe066', 3);
     }
   }
@@ -1469,7 +1467,7 @@ function physics(dt) {
     else if (P.vy < 0)   { P.y = s.y + s.h; P.vy = 0; }
   }
   if (P.onGround) {
-    P.charged = false; P.lift = 0; P.liftUsed = false;   // a new jump, a new chance to lift
+    P.charged = false; P.lift = 0;                       // a new jump, a new lift
     if (wasAir) {
       sfx.land();
       for (let i = 0; i < 8; i++) part(P.x + P.w / 2 + rnd(-12, 12), P.y + P.h, rnd(-110, 110), rnd(-60, -10), 0.3, '#8fa8d8', 2.4);
@@ -1478,15 +1476,15 @@ function physics(dt) {
   }
   P.run += Math.abs(P.vx) * dt;
 
-  /* uses trickle back */
-  if (P.charges < CHARGE_MAX) {
-    P.refill += dt;
-    if (P.refill >= CHARGE_REFILL) { P.refill = 0; P.charges++; sfx.recharge(); }
-  } else P.refill = 0;
 }
 
 /* ------------------------------ hazards -------------------------------- */
 function hazards(dt) {
+  /* lava */
+  for (const l of W.lava) {
+    if (l.x > P.x + P.w + 40 || l.x + l.w < P.x - 40) continue;
+    if (aabb(P, l)) return die('BURNED ALIVE');
+  }
   /* spikes */
   for (const s of W.spikes) {
     if (s.x > P.x + P.w + 40 || s.x + s.w < P.x - 40) continue;
@@ -1947,6 +1945,41 @@ function drawSpikes(s) {
   else if (s.dir === 'down') ctx.fillRect(s.x, s.y, s.w, 3);
 }
 
+function drawLava(l) {
+  const surf = l.y + 6;
+  ctx.save();
+  /* the molten body */
+  const g = ctx.createLinearGradient(0, l.y, 0, l.y + l.h);
+  g.addColorStop(0, '#ffd166');
+  g.addColorStop(0.22, '#ff7b2e');
+  g.addColorStop(1, '#8c1c0c');
+  ctx.fillStyle = g;
+  ctx.fillRect(l.x, l.y, l.w, l.h);
+  /* a bobbing surface line so it reads as liquid, not paint */
+  ctx.beginPath();
+  ctx.moveTo(l.x, l.y + l.h);
+  for (let px = 0; px <= l.w; px += 12) {
+    const wob = Math.sin((px * 0.055) + S.t * 2.1 + l.t) * 3 +
+                Math.sin((px * 0.017) - S.t * 1.3 + l.t) * 2;
+    ctx.lineTo(l.x + px, surf + wob);
+  }
+  ctx.lineTo(l.x + l.w, l.y + l.h);
+  ctx.closePath();
+  ctx.fillStyle = '#ffe9a8';
+  ctx.globalAlpha = 0.9; ctx.fill(); ctx.globalAlpha = 1;
+  /* glow above the surface */
+  const gl = ctx.createLinearGradient(0, surf - 46, 0, surf + 6);
+  gl.addColorStop(0, 'rgba(255,120,40,0)');
+  gl.addColorStop(1, 'rgba(255,140,50,.34)');
+  ctx.fillStyle = gl;
+  ctx.fillRect(l.x - 6, surf - 46, l.w + 12, 52);
+  ctx.restore();
+  /* embers drifting up out of the opening */
+  if (chance(0.22))
+    part(l.x + rnd(4, l.w - 4), surf, rnd(-16, 16), rnd(-90, -34),
+         rnd(0.5, 1.2), chance(0.5) ? '#ffb257' : '#ff7043', rnd(1.6, 3.2));
+}
+
 function drawEnemy(e) {
   ctx.save();
   if (e.type === 'walker') {
@@ -2182,63 +2215,6 @@ function drawPlayer() {
     ctx.fillStyle = 'rgba(140,230,255,.35)';
     ctx.fillRect(x + w / 2 - 2 + sw, y + h - 3, 4, 3);
   }
-  /* ---- charge uses, worn on the chest ---- */
-  {
-    const bw = 7, bh = 11, gap = 3;
-    const total = CHARGE_MAX * bw + (CHARGE_MAX - 1) * gap;
-    const bx0 = x + w / 2 - total / 2;
-    const by = y + (P.crouch ? 5 : 13);
-    for (let i = 0; i < CHARGE_MAX; i++) {
-      const bx = bx0 + i * (bw + gap);
-      /* this slot is full, empty, or the one currently refilling */
-      const full = i < P.charges;
-      const filling = !full && i === P.charges && P.charges < CHARGE_MAX;
-      const prog = filling ? clamp(P.refill / CHARGE_REFILL, 0, 1) : 0;
-      const bolt = () => {
-        ctx.beginPath();
-        ctx.moveTo(bx + bw * 0.62, by);
-        ctx.lineTo(bx + bw * 0.06, by + bh * 0.58);
-        ctx.lineTo(bx + bw * 0.44, by + bh * 0.58);
-        ctx.lineTo(bx + bw * 0.30, by + bh);
-        ctx.lineTo(bx + bw * 0.96, by + bh * 0.40);
-        ctx.lineTo(bx + bw * 0.56, by + bh * 0.40);
-        ctx.closePath();
-      };
-      /* empty socket */
-      ctx.save();
-      bolt();
-      ctx.fillStyle = 'rgba(10,18,34,.75)'; ctx.fill();
-      ctx.restore();
-      if (full || prog > 0) {
-        ctx.save();
-        bolt();
-        ctx.clip();
-        if (full) {
-          ctx.shadowColor = 'rgba(255,224,102,.95)'; ctx.shadowBlur = 7;
-          ctx.fillStyle = P.lift > 0 ? '#fffbe0' : '#ffe066';
-          ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
-        } else {
-          ctx.fillStyle = 'rgba(255,224,102,.55)';      /* fills from the bottom */
-          ctx.fillRect(bx - 1, by + bh * (1 - prog), bw + 2, bh * prog + 1);
-        }
-        ctx.restore();
-      }
-      ctx.save();
-      bolt();
-      ctx.strokeStyle = full ? 'rgba(255,240,170,.9)' : 'rgba(150,170,210,.45)';
-      ctx.lineWidth = 1; ctx.stroke();
-      ctx.restore();
-    }
-  }
-
-  /* double-jump ring */
-  if (!P.onGround && P.jumps < 2) {
-    ctx.save();
-    ctx.globalAlpha = 0.5 + 0.3 * Math.sin(S.t * 12);
-    ctx.strokeStyle = '#b98cff'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.ellipse(x + w / 2, y + h + 8, 13, 5, 0, 0, 7); ctx.stroke();
-    ctx.restore();
-  }
 }
 
 function drawStorm() {
@@ -2349,6 +2325,10 @@ function render() {
     if (s.y > y1 || s.y + s.h < y0) continue;
     drawSolid(s);
   }
+  for (const l of W.lava) {
+    if (l.x > x1 || l.x + l.w < x0 || l.y > y1 || l.y + l.h < y0) continue;
+    drawLava(l);
+  }
   for (const s of W.spikes) {
     if (s.x > x1 || s.x + s.w < x0 || s.y > y1 || s.y + s.h < y0) continue;
     drawSpikes(s);
@@ -2447,7 +2427,8 @@ function frame(now) {
 function bootScene() {
   /* a quiet idle world behind the menu */
   W.solids = []; W.spikes = []; W.enemies = []; W.bullets = []; W.zones = []; W.parts = [];
-  W.backs = []; W.drops = []; W.segs = []; W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
+  W.backs = []; W.drops = []; W.lava = []; W.segs = [];
+  W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
   addGround(-800, 0, 3600);
   W.segs.push({ x0: -800, x1: 2800, killY: 980, id: 'flat' });
   W.genX = 2800; W.genY = 0;
