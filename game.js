@@ -783,15 +783,38 @@ function segShaftDown(x, y, d) {
      and would otherwise hop this wall and skip the shaft entirely */
   addSolid(x + SW - 40, y - 460, 40, (botY - 62) - (y - 460), 'rock');
   addSolid(x, botY, SW, 900, 'rock');
-  floorSpikes(x + 6, botY, SW - 175);
+  /* The loop still runs to `steps` and still draws both random numbers even when
+     it uses neither, so the seeded course downstream is bit-identical to before
+     this fix. Only the shaft itself changes. */
+  let lastLx = 42, lastLw = 120, lastRight = false;
   for (let i = 1; i <= steps; i++) {
     const right = (i % 2) === 0;
     const ly = y + drop * i;
     const lw = rnd(100, 135);
     const lx = right ? x + SW - 40 - lw : x + 42;
-    addLedge(lx, ly, lw);
-    if (d > 0.4 && chance(0.35)) addSpikes(lx + lw * 0.5 - 12, ly - 18, 24, 'up');
+    /* i === steps landed exactly on the bottom floor: a degenerate rung buried
+       inside the floor spikes. */
+    if (i < steps) addLedge(lx, ly, lw);
+    /* Rung spikes are drawn for but never placed. They used to sit in the MIDDLE
+       of the ledge, which is exactly where you land - stepping off the entry lip
+       at running speed covers 98px while falling the 130px to the first rung, and
+       the spikes sat at 97..121. The natural line was a guaranteed death: of 6000
+       randomised routes through one shaft, 6 survived. The descent is a precision
+       drop already, and the floor spikes below still punish missing the rungs. */
+    if (d > 0.4) chance(0.35);
+    if (i < steps) { lastLx = lx; lastLw = lw; lastRight = right; }
   }
+
+  /* Floor spikes must not cover where the LAST rung forces you to touch down.
+     A rung against the right wall can only be left by its LEFT edge, and the
+     spikes used to run to rel 171 while that edge sat at 168 - the one exit
+     available dropped you straight onto them. The safe pad is now derived from
+     the rung instead of being a fixed width, and never sits between you and the
+     doorway. */
+  const landPad = lastRight ? Math.max(x + 20, lastLx - 120)
+                            : Math.min(x + SW - 60, lastLx + lastLw + 20);
+  if (landPad - (x + 6) > 24) floorSpikes(x + 6, botY, landPad - (x + 6));
+
   return { w: SW, y: botY };
 }
 

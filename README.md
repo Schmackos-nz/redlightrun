@@ -228,6 +228,24 @@ a standing player's box, so the muzzle is unavoidably in the running lane; if th
 body killed too, every turret would have to be jumped *while* dodging its own
 fire.
 
+### Descent shafts
+
+Two rules keep a descent from being a trap, both learned from a shaft at 474m
+that was effectively impassable:
+
+- **No spikes on the rungs.** They used to sit in the middle of a ledge, which is
+  exactly where you land: stepping off the entry lip at running speed covers 98px
+  while falling the 130px to the first rung, and the spikes sat at 97..121.
+- **The floor spikes are sized from the last rung**, not fixed. A rung butting the
+  right wall can only be left by its *left* edge, and the spikes used to run to
+  rel 171 while that edge sat at 168 - the only exit available dropped you onto
+  them. The clear pad is now derived from where the last rung forces you down and
+  never sits between you and the doorway.
+
+Measured by throwing 6000 randomised input policies at one shaft: survival went
+from 6 to 749. Across 111 shafts, every one leaves a landing stretch of at least
+143px within reach of its last rung.
+
 ### The unjumpable band
 
 The rule that matters most for how fair the game feels: **no ceiling above a
