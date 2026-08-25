@@ -52,13 +52,21 @@ Append `?touch` to force the mobile scheme on a desktop for layout checks.
 - **Watcher zones** are red-light/green-light. Inside one, moving while the eye
   is red kills you. The amber phase is your warning to come to a complete stop -
   you slide for about a tenth of a second after releasing, so stop early.
-- **The wall does not advance on its own.** It winds up while you are not making
-  progress, and unwinds over 100 m of running. Standing still from a full 100 m
-  lead is fatal in about 13 s; running sheds the whole wind-up over 100 m.
-  Climbing counts as progress (net new height, so hopping on the spot does not),
-  and a red light freezes the wall along with you.
-- A chase bar at the top shows a 100 m span: a skull for the wall, an arrow for
-  you. It reddens and the skull pulses as it closes.
+- **The wall is always coming.** It creeps at a baseline of 55-150 px/s and winds
+  up on top of that while you are not making progress, shedding the wind-up over
+  100 m of running. The baseline alone can never catch you - you run 330 - so
+  running is always an answer; a full head of steam *can*, which is what turns a
+  stall into a debt you have to sprint off rather than a number on a bar.
+  Climbing counts as progress (net new height, so hopping on the spot does not).
+  Three things hold the wall completely still, the same three that reset the
+  stall timer: a red light, riding a moving platform, and waiting for a lift.
+  None of them earn distance, and distance is the only score, so none is
+  farmable - but a 12 s lift cycle would otherwise be fatal on the creep alone.
+- The wall trails **60 m**, not 100. At a 100 m trail it sat parked at the clamp
+  the whole time you were running and never read as a threat.
+- The chase bar at the top spans exactly that trail: a skull for the wall, an
+  arrow for you. It reddens and the skull pulses as it closes. The span is read
+  from the trail rather than fixed, so no part of the bar is ever dead.
 - Score is distance in metres; the top ten runs are kept in `localStorage`.
 
 ## Music
@@ -111,7 +119,7 @@ floor spikes, so the read is immediate. Landing on one kills you and leaves the
 enemy standing. Both kinds appear from 110m, so you learn to look before leaping.
 
 **Chasers** (from 154m) sit still until you come within 380px, then run you down
-at 235px/s. That is slower than your 330, so they can always be outrun, but they
+at 205px/s. That is slower than your 330, so they can always be outrun, but they
 follow a long way and only give up past 760px. A watcher's red light freezes them
 - without that, being forced to stand still with one bearing down on you is
 unwinnable.
@@ -140,14 +148,66 @@ flat breather inserted after most hard segments:
 `fly` `slsh` (bladeworks) `gaunt` (spike teeth) `climb` (the ascent)
 `holes` (the drop)
 
+### The vault: breakable floor
+
+From 165m a `vault` segment blocks the surface with a **gate** 300px tall - taller
+than the 228px a charge jump lifts your feet, so it cannot be cleared. At its foot
+is a stretch of **cracked floor**, and the only way past is to jump and dive
+through it: crouch in mid-air, punch down, walk the chamber under the gate, and
+climb the stairs out beyond it.
+
+Two rules make this a puzzle rather than a trap:
+
+- **Only a dive opens it.** Standing on it, a full-speed fall from 700px, and a
+  stomp bounce all land on it like ordinary ground. If a plain fall broke it you
+  would drop through by accident and the gate would stop teaching anything.
+- **The cracked stretch sits hard against the gate.** You are already standing on
+  the answer when you run into the problem, so it teaches itself instead of
+  stranding you a run-up away from the solution.
+
+The stairs out rise 100, then 90, then 40 - all well inside a single jump's 166 -
+because the climb should never be the hard part. The dive is. There are
+deliberately no enemies in a vault: you come out of the chamber with no momentum
+at all, and anything waiting at the top of the stairs turns a puzzle into an
+ambush.
+
+`gate` is its own solid kind rather than a `block` precisely so the "nothing is
+unclearable" audit stays a real invariant instead of being loosened to admit it.
+The audit checks every gate is backed by the way through: brittle floor at its
+foot, at least 90px of it, and a chamber 90-600px below.
+
+### Gunners
+
+From 209m, some bodies carry a gun. A **gunner** patrols and stomps like a
+walker, but takes a shot whenever you are roughly level with it. The shot is
+always a **high** one, so ducking is a complete answer - and ducking is instant
+and holdable, which is the only kind of answer that stays fair against a gun that
+is also walking toward you. It flashes for 0.42 s before firing, so the jump over
+it can be timed, and it will not shoot at anything more than 130px off its own
+level, so it cannot pot you off a tower.
+
+Gunners hold fire near a **turret hall or gauntlet** - inside one, and across the
+700px approach and 400px exit. Those segments are measured to demand exactly one
+kind of dodge; a gunner firing a high shot into a low hall asks for a duck and a
+hop at the same instant, which is not dodgeable. The approach counts because you
+are committed to the hall's rhythm a good second before you enter it.
+
+For the same reason two turret halls are never placed within `TURRET_HALL_GAP`
+(1400px) of each other: a turret shoots from 1000px away, which reaches straight
+through a short breather segment into the next hall.
+
 ### Mortars
 
 From 275m, some shaft and tower walls carry a **lobber**: a mortar that arcs a
 shell at wherever you are standing when it fires. It will not fire again until
 that shell has landed or expired, so a single gun never has two in the air. A
-pulsing ring marks where the shell is coming down, and the charge glow telegraphs
-the shot, so the 0.55s wind-up plus flight time is your window to move. Standing
-put gets you hit; walking off the marked spot does not.
+A marker shows where the shell is going **before** it fires: it tracks your feet
+through the whole 0.55 s wind-up and locks the instant the gun lets go, tightening
+onto the spot as the charge fills. A second ring marks the shell in flight. The
+telegraph has to track rather than simply appear, because the shell aims at where
+you are standing at the moment of release - a marker that only showed up once the
+shell was airborne told you where not to be a beat too late. Standing put gets you
+hit; walking off the marked spot does not.
 
 ### Verticality
 

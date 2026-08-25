@@ -309,6 +309,7 @@ const sfx = {
   mark:  () => tone(1050, 0.09, 'sine', 0.10, 1400),
   lob:   () => { tone(150, 0.16, 'sine', 0.16, 320); noise(0.1, 0.07, 600); },
   stomp: () => { tone(320, 0.11, 'square', 0.2, 120); noise(0.12, 0.14, 1100); },
+  smash: () => { noise(0.26, 0.2, 2600); tone(150, 0.22, 'square', 0.14, 55); },
   spot:  () => tone(210, 0.13, 'sawtooth', 0.11, 430),
   charge: () => { tone(520, 0.2, 'sawtooth', 0.15, 1180); noise(0.09, 0.05, 3000); },
   dive:  () => { tone(700, 0.14, 'square', 0.13, 190); noise(0.08, 0.06, 1600); }
@@ -500,8 +501,20 @@ function addCrumble(x, y, w) {
   W.solids.push({ x, y, w, h: 20, oneWay: true, kind: 'crumble',
     crumb: { state: 'solid', t: 0, delay: 0.5, respawn: 2.6 } });
 }
-/* A crumbled platform is not there; everything else always is. */
-function solidOn(s) { return !s.crumb || s.crumb.state !== 'gone'; }
+/* Floor that only a dive will open. It holds your weight and stops a plain fall
+   dead, so you cannot stumble through one by accident - you have to jump and
+   punch down through it. Once broken it stays broken; there is nothing on the
+   far side worth climbing back for. */
+function addBrittle(x, y, w) {
+  W.solids.push({ x, y, w, h: 22, oneWay: false, kind: 'brittle',
+    brit: { state: 'solid', t: 0 } });
+}
+/* A crumbled or smashed platform is not there; everything else always is. */
+function solidOn(s) {
+  if (s.crumb && s.crumb.state === 'gone') return false;
+  if (s.brit && s.brit.state === 'gone') return false;
+  return true;
+}
 
 /* Which moving platform is holding the player up, judged by where things were
    BEFORE this frame's move. Resting exactly flush produces no AABB overlap, so
@@ -582,7 +595,7 @@ function chaser(x, surfY, spiky) {
   if (x < SAFE_X) return;
   W.enemies.push({ type: 'chaser', x: x - 16, y: surfY - 40, w: 32, h: 40,
     sy: surfY, vx: 0, vy: 0, dir: -1, aggro: false, onGround: true, t: 0,
-    speed: 235, spiky: !!spiky });
+    speed: 205, spiky: !!spiky });
 }
 
 /* The top of whatever would block this box at nx, or null if the way is clear.
@@ -629,6 +642,9 @@ const TURRET_RATE = 1.95;
 const UP_MUZZLE = 58;
 /* Two turrets closer than this put their shots on top of each other. */
 const TURRET_MIN_GAP = 210;
+/* Two halls closer than a turret's own 1000px firing reach can put opposite
+   modes on you at once, so they are kept a clear reach apart. */
+const TURRET_HALL_GAP = 1400;
 
 function turret(x, surfY, mode, phase, salvo) {
   // high = shoots over a crouching player, low = must be jumped
@@ -673,6 +689,22 @@ function fireLob(e) {
   part(sx, sy, e.dir * 60, -120, 0.3, '#ffd08a', 4);
 }
 
+/* A walker with a gun on its back. It patrols like one and stomps like one, but
+   it takes a shot at you whenever you are roughly level with it. The shot is
+   always a HIGH one: ducking is instant and can be held, which is the only kind
+   of answer that stays fair against a gun that is also walking towards you. It
+   flashes for GUN_TELL before it lets go, so the jump over it can be timed. */
+const GUNNER_D = 0.38;                                   // 209m
+const GUN_TELL = 0.42;
+
+function gunner(x, surfY, d, spiky) {
+  if (x < SAFE_X) return;
+  W.enemies.push({ type: 'gunner', x: x - 16, y: surfY - 40, w: 32, h: 40,
+    sy: surfY, minX: x - 90, maxX: x + 90, vx: chance(0.5) ? -52 : 52,
+    dir: -1, cd: rnd(0.7, 1.9), rate: 2.7 - 0.7 * d, charge: 0, t: 0,
+    spiky: !!spiky });
+}
+
 function slasher(x, surfY) {
   if (x < SAFE_X) return;
   W.enemies.push({ type: 'slasher', x: x - 16, y: surfY - 44, w: 32, h: 44,
@@ -684,16 +716,49 @@ function slasher(x, surfY) {
 function segFlat(x, y, d) {
   const w = rnd(340, 640);
   addGround(x, y, w);
-  if (x > SAFE_X && d > CHASER_D && chance(0.16 + 0.2 * d)) {
-    chaser(x + w * 0.62, y, d > SPIKY_D && chance(0.35));
-  } else if (x > SAFE_X && chance(0.3 + 0.35 * d)) {
-    walker(x + w * 0.5, y, x + 50, x + w - 50, d > SPIKY_D && chance(0.4));
-  } else {
-    const n = chance(0.55) ? 1 : (d > 0.4 && chance(0.4) ? 2 : 0);
-    for (let i = 0; i < n; i++) {
-      const bh = rnd(45, 95 + 115 * d);                  // tops out at 210; a charge jump lifts the feet 228
-      addSolid(x + 100 + (w - 240) * (n === 1 ? rnd(0.15, 0.85) : i / n + 0.1),
-               y - bh, rnd(32, 58), bh, 'block');
+  /* Blocks are laid FIRST so bodies can be placed around them. A flat run used
+     to hold a block or one enemy and never both, which is why long stretches
+     read as empty; and a chaser now collides with the world, so one spawned
+     inside a block would grind against it forever. */
+  const n = chance(0.55) ? 1 : (d > 0.4 && chance(0.4) ? 2 : 0);
+  const blocks = [];
+  for (let i = 0; i < n; i++) {
+    const bh = rnd(45, 95 + 115 * d);                    // tops out at 210; a charge jump lifts the feet 228
+    const bw = rnd(32, 58);
+    const bx = x + 100 + (w - 240) * (n === 1 ? rnd(0.15, 0.85) : i / n + 0.1);
+    addSolid(bx, y - bh, bw, bh, 'block');
+    blocks.push({ x: bx, w: bw });
+  }
+  /* Stances spread across the whole run, minus any that would drop a body on
+     top of a block. Filling only the space AFTER the last block sounds tidier
+     and is much worse: a block near the middle leaves nowhere at all. */
+  const spots = [];
+  for (const f of [0.22, 0.5, 0.78]) {
+    const px = x + 70 + (w - 170) * f;
+    let ok = true;
+    for (const b of blocks) if (px + 32 > b.x - 46 && px < b.x + b.w + 46) ok = false;
+    if (ok) spots.push(px);
+  }
+  const want = Math.min(spots.length,
+    d > 0.55 && chance(0.6) ? 3 : d > 0.3 ? 2 : 1);
+  for (let i = 0; i < want && x > SAFE_X; i++) {
+    const px = spots[Math.floor(i * spots.length / want)];
+    const spiky = d > SPIKY_D && chance(0.32);
+    /* One roll picks the kind, rather than three gates in a row. A priority
+       chain quietly starves whatever sits at the end of it - walkers had all
+       but vanished from the course that way. */
+    const roll = rnd(0, 1);
+    if (d > CHASER_D && roll < 0.30) chaser(px, y, spiky);
+    else if (d > GUNNER_D && roll < 0.54) gunner(px, y, d, spiky);
+    else if (roll < 0.93) {
+      /* keep its beat between the blocks either side, so it does not pace
+         straight through one */
+      let lo = x + 50, hi = x + w - 50;
+      for (const b of blocks) {
+        if (b.x + b.w <= px) lo = Math.max(lo, b.x + b.w + 6);
+        else if (b.x >= px + 32) hi = Math.min(hi, b.x - 6);
+      }
+      if (hi - lo > 70) walker(px - 15, y, lo, hi, spiky);
     }
   }
   return { w, y };
@@ -981,6 +1046,42 @@ function segGauntlet(x, y, d) {
    killing you: the cost is the climb, not the run. Moving and crumbling rungs
    are mixed in as the course goes on. */
 const MOVER_D = 0.45, CRUMBLE_D = 0.62, LOBBER_D = 0.50;
+const VAULT_D = 0.30;                                    // 165m
+
+/* A wall too tall to clear, with brittle floor at its foot. The only way past
+   is to jump and dive through the floor, walk the chamber under the wall, and
+   climb out beyond it. The brittle stretch sits hard against the wall on
+   purpose: you are already standing on the answer when you run into the
+   problem, so it teaches itself rather than stranding you. */
+function segVault(x, y, d) {
+  const runW = rnd(230, 340);
+  const britW = 158;
+  const wallW = 46, wallH = 300;                         // 300 > the 228 a charge jump lifts your feet
+  const FLOOR = y + 230;                                 // headroom for a standing player and then some
+  const wallX = x + runW + britW;
+  const stepX = wallX + wallW + 55;
+  const exitX = stepX + 190;
+  const w = (exitX + 300) - x;
+
+  addGround(x, y, runW);
+  addBrittle(x + runW, y, britW);
+  addSolid(wallX, y - wallH, wallW, wallH, 'gate');   // its own kind: deliberately unclearable
+  addBack(x + runW - 30, y, (exitX + 40) - (x + runW - 30), 250);
+
+  /* the chamber, running from under the brittle floor to past the wall */
+  addGround(x + runW - 30, FLOOR, (exitX + 40) - (x + runW - 30));
+
+  /* the stairs out: 100, then 90, then 40 - all well inside a single jump's 166,
+     so the climb is never the hard part. The dive is. */
+  addSolid(stepX, FLOOR - 100, 95, 100, 'block');
+  addSolid(stepX + 95, FLOOR - 190, 95, 190, 'block');
+  addGround(exitX, y, (x + w) - exitX);
+
+  /* Deliberately no bodies in here. You come out of the chamber with no
+     momentum at all, and anything waiting at the top of the stairs turns a
+     puzzle into an ambush - the segment is about the dive, nothing else. */
+  return { w, y };
+}
 
 function segClimb(x, y, d) {
   const w = 430, WALL = 40;
@@ -1128,7 +1229,8 @@ const POOL = [
   { id: 'gaunt', f: segGauntlet,  w: d => 0.35 + 1.7 * d,     minD: 0.46 },  // 253m
   { id: 'climb', f: segClimb,     w: d => 0.9 + 2.2 * d,      minD: 0.22, up: 1 },   // 121m
   { id: 'holes', f: segDropHoles, w: d => 0.7 + 1.8 * d,      minD: 0.26, up: -1 },  // 143m
-  { id: 'lift',  f: segLift,      w: d => 0.8 + 1.9 * d,      minD: ELEV_D }        // 187m
+  { id: 'lift',  f: segLift,      w: d => 0.8 + 1.9 * d,      minD: ELEV_D },       // 187m
+  { id: 'vault', f: segVault,     w: d => 0.5 + 1.4 * d,      minD: VAULT_D }       // 165m
 ];
 
 /* How far the course currently sits above where it started. Ascending and
@@ -1197,6 +1299,11 @@ function generateSeeded() {
     const ws = POOL.map(p => {
       let v = d < p.minD ? 0 : p.w(d);
       if (p.id === W.lastType) v *= 0.15;
+      /* Keep a hall clear of the last one's fire. A turret shoots at you from
+         1000px away, which reaches straight through a short breather segment
+         into the next hall - and a HIGH hall bleeding into a LOW one demands a
+         duck and a hop at the same instant, which is not dodgeable. */
+      if (p.id === 'turr' && W.genX - (W.lastTurrEnd || -1e9) < TURRET_HALL_GAP) v = 0;
       /* steer the elevation back toward the middle */
       if (p.up === 1)  v *= hi > 1500 ? 0 : hi > 800 ? 0.25 : hi < 0 ? 2.2 : 1;
       if (p.up === -1) v *= hi < 200 ? 0.05 : hi > 900 ? 2.6 : 1;
@@ -1212,6 +1319,7 @@ function generateSeeded() {
   W.genX = x + res.w;
   W.genY = res.y;
   W.lastType = entry.id;
+  if (entry.id === 'turr') W.lastTurrEnd = W.genX;
   W.n++;
 }
 
@@ -1242,7 +1350,14 @@ function startAtMetres(metres) {
     const box = { x: px, y: top - PH, w: PW, h: PH };
     for (const sp of W.spikes) if (aabb(box, sp)) return null;
     for (const l of W.lava) if (aabb(box, l)) return null;
-    for (const e of W.enemies) if (e.type !== 'turret' && aabb(box, e)) return null;
+    /* Guns are scenery you can stand inside; everything else needs ROOM, not
+       just a clear box. Enemies move, and a spot that is empty at the instant
+       you spawn is no good if a walker is two steps away from it. */
+    const room = { x: px - 80, y: top - PH - 20, w: PW + 160, h: PH + 40 };
+    for (const e of W.enemies) {
+      if (e.type === 'turret' || e.type === 'lobber') continue;
+      if (aabb(room, e)) return null;
+    }
     return top;
   }
 
@@ -1263,7 +1378,7 @@ function startAtMetres(metres) {
   S.dist = Math.max(0, Math.floor((P.x - S.startX) / PPM));
   S.practice = true;
   $('dist').textContent = S.dist;
-  storm.x = P.x - 1020;
+  storm.x = P.x - STORM_TRAIL;
   W.bullets.length = 0; W.parts.length = 0;
   cam.x = P.x + P.w / 2 - viewW * 0.38;
   cam.y = P.y + P.h / 2 - viewH * 0.60;
@@ -1303,7 +1418,10 @@ const cam = { x: 0, y: 0, sx: 0, sy: 0 };
 /* The wall no longer advances on its own. It only gains speed while you are not
    making progress, and that speed bleeds away again over 100m of running. The
    trail matches the 100m the chase indicator shows. */
-const STORM_TRAIL = 100 * PPM;      // 2000px: the full span of the chase bar
+/* 60m, not 100. At a 100m trail the wall sat parked at the clamp the entire
+   time you were running: the skull never left the end of the bar and it never
+   read as a threat. It now sits inside the bar with room to close on you. */
+const STORM_TRAIL = 60 * PPM;
 const BOOST_SHED  = 100 * PPM;      // 100m of progress sheds a full head of steam
 const STALL_GRACE = 0.8;            // pausing to line up a jump is not stalling
 const storm = { x: 0, v: 0, boost: 0, flash: 0 };
@@ -1343,7 +1461,7 @@ function startRun(isReplay) {
   else { REC.tape.length = 0; REC.playing = false; }
   W.solids = []; W.spikes = []; W.enemies = []; W.bullets = []; W.zones = []; W.parts = [];
   W.backs = []; W.drops = []; W.lava = []; W.segs = [];
-  W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
+  W.genX = 0; W.genY = 0; W.lastType = ''; W.lastTurrEnd = -1e9; W.n = 0;
   wstate = WORLD_SEED;                                   // rewind the course
 
   addGround(-600, 0, 700);                                // safe launch pad
@@ -1533,6 +1651,7 @@ function physics(dt) {
   /* ---- dive: crouch in mid-air to come straight back down ---- */
   if (downPressed && !P.onGround && P.vy > -DIVE_V) {
     P.vy = DIVE_V;
+    P.diving = true;                                     // arms a brittle floor
     P.lift = 0;                                          // cancels a charge lift
     sfx.dive();
     for (let i = 0; i < 9; i++)
@@ -1623,11 +1742,25 @@ function physics(dt) {
         P.y = s.y - P.h; P.vy = 0; P.onGround = true; P.riding = s;
         if (s.crumb && s.crumb.state === 'solid') { s.crumb.state = 'shaking'; s.crumb.t = 0; }
       }
-    } else if (P.vy > 0) { P.y = s.y - P.h; P.vy = 0; P.onGround = true; P.riding = s; }
+    } else if (P.vy > 0) {
+      /* A dive punches through brittle floor. Any other landing - a plain fall,
+         a bounce off a stomp - is caught by it like ordinary ground. */
+      if (s.kind === 'brittle' && s.brit.state === 'solid') {
+        if (P.diving) {
+          s.brit.state = 'gone'; s.brit.t = 0;
+          sfx.smash();
+          for (let i = 0; i < 16; i++)
+            part(s.x + rnd(0, s.w), s.y + rnd(0, 18), rnd(-190, 190), rnd(-160, 90), 0.55, '#cbb6e8', 3.4);
+          continue;                                      // keep falling
+        }
+      }
+      P.y = s.y - P.h; P.vy = 0; P.onGround = true; P.riding = s;
+    }
     else if (P.vy < 0)   { P.y = s.y + s.h; P.vy = 0; }
   }
   if (P.onGround) {
     P.charged = false; P.lift = 0;                       // a new jump, a new lift
+    P.diving = false;
     if (wasAir) {
       sfx.land();
       for (let i = 0; i < 8; i++) part(P.x + P.w / 2 + rnd(-12, 12), P.y + P.h, rnd(-110, 110), rnd(-60, -10), 0.3, '#8fa8d8', 2.4);
@@ -1695,7 +1828,25 @@ function hazards(dt) {
 }
 
 /* ------------------------------ entities ------------------------------- */
+/* Which segment you are standing in. Turret halls and gauntlets are timed to
+   demand exactly ONE kind of dodge; a gunner on the open ground next door
+   firing into one breaks that guarantee outright, and the hall stops being
+   the fair thing it was measured to be. */
+/* Turret halls and gauntlets are measured to demand exactly ONE kind of dodge.
+   A gunner on the open ground next door firing into one breaks that outright -
+   and the approach counts, because you are already committed to the hall's
+   rhythm a good second before you enter it. */
+function nearChoreography() {
+  const px = P.x + P.w / 2;
+  for (const sg of W.segs) {
+    if (sg.id !== 'turr' && sg.id !== 'gaunt') continue;
+    if (px > sg.x0 - 700 && px < sg.x1 + 400) return true;
+  }
+  return false;
+}
+
 function updateEntities(dt) {
+  const holdGuns = nearChoreography();
   for (const e of W.enemies) {
     if (e.x < cam.x - 400 || e.x > cam.x + viewW + 500) { if (e.type === 'turret') e.cd = Math.max(e.cd, 0.35); continue; }
     if (e.type === 'walker') {
@@ -1710,6 +1861,29 @@ function updateEntities(dt) {
       if (e.x > e.maxX) { e.x = e.maxX; e.vx = -Math.abs(e.vx); }
       e.y = e.baseY + Math.sin(e.t * 2.6) * e.amp;
       if (chance(0.14)) part(e.x + e.w / 2 + rnd(-6, 6), e.y + e.h, rnd(-16, 16), rnd(10, 40), 0.4, '#ff8ad0', 2);
+    } else if (e.type === 'gunner') {
+      e.t += dt;
+      e.x += e.vx * dt;
+      if (e.x < e.minX)         { e.x = e.minX; e.vx = Math.abs(e.vx); }
+      if (e.x + e.w > e.maxX)   { e.x = e.maxX - e.w; e.vx = -Math.abs(e.vx); }
+      const gdx = (P.x + P.w / 2) - (e.x + e.w / 2);
+      /* only shoots at things on its own level - it cannot pot you off a tower */
+      const levelWith = Math.abs((P.y + P.h) - (e.y + e.h)) < 130;
+      /* only on open ground - never into a hall or a gauntlet, nor across its
+         approach, where you are already committed to its rhythm */
+      if (Math.abs(gdx) < 660 && levelWith && !redFreeze && !holdGuns) {
+        e.dir = gdx < 0 ? -1 : 1;
+        e.cd -= dt;
+        e.charge = e.cd < GUN_TELL ? clamp(1 - e.cd / GUN_TELL, 0, 1) : 0;
+        if (e.cd <= 0) {
+          e.cd = e.rate; e.charge = 0;
+          const mx = e.x + e.w / 2 + e.dir * 17;
+          W.bullets.push({ x: mx, y: e.y + 6, vx: e.dir * BULLET_SPEED, vy: 0,
+            r: 6, life: 4.6, t: 0, aim: 'high' });
+          part(mx, e.y + 6, e.dir * 120, rnd(-40, 40), 0.22, '#ffd48a', 3);
+          sfx.shoot();
+        }
+      } else { e.charge = 0; }
     } else if (e.type === 'turret') {
       e.cd -= dt;
       /* fires while you are anywhere near it, not just while you approach - the
@@ -1732,6 +1906,11 @@ function updateEntities(dt) {
           e.cd -= dt;
           if (e.cd <= 0) {
             e.charge += dt;
+            /* It aims at where you are standing at the moment it lets go, so the
+               honest telegraph is a marker that TRACKS you while it winds up and
+               locks the instant it fires. Showing it only once the shell is in
+               the air told you where to not be a beat too late. */
+            e.aimX = P.x + P.w / 2; e.aimY = P.y + P.h;
             if (e.charge >= LOB_CHARGE) { fireLob(e); e.charge = 0; e.busy = true; sfx.lob(); }
           }
         } else { e.charge = 0; }
@@ -1923,6 +2102,11 @@ function update(dt) {
      would be a death sentence. A red light freezes everything, since being
      still there is the rule, not a choice. */
   const d = runDifficulty();
+  /* A baseline creep, so it is always coming, on top of the wind-up that
+     punishes standing still. Base alone can never catch a runner (150 against
+     your 330); base plus a full head of steam can, which is what turns a stall
+     into a debt you have to sprint off rather than a number on a bar. */
+  const baseSpeed = 55 + 95 * d;
   const boostMax = 200 + 90 * d;
   const boostRamp = 70 + 60 * d;
   const adv = P.x - S.maxX;                              // progress past your best
@@ -1946,8 +2130,14 @@ function update(dt) {
   if (!redFreeze && S.stallT > STALL_GRACE)
     storm.boost = Math.min(boostMax, storm.boost + boostRamp * dt);
 
-  storm.v = storm.boost;
-  if (!redFreeze) storm.x += storm.v * dt;
+  /* The same three things that reset the stall timer also hold the wall still.
+     With a baseline creep they have to: waiting out a lift cycle is the route,
+     not dithering, and 12s of it was enough for the creep alone to eat you.
+     Nothing is farmable here - none of these states earn distance, and distance
+     is the only score. */
+  const held = redFreeze || (P.riding && P.riding.mov) || waitingOnLift();
+  storm.v = held ? 0 : baseSpeed + storm.boost;
+  storm.x += storm.v * dt;
   if (P.x - storm.x > STORM_TRAIL) storm.x = P.x - STORM_TRAIL;
 
   /* Music tracks the wall. The gap now runs to 2000px, but the interesting part
@@ -1978,9 +2168,17 @@ function update(dt) {
   for (const sg of W.segs) if (P.x + P.w > sg.x0 && P.x < sg.x1) { lbl = SEG_LABEL[sg.id] || ''; break; }
   if (lbl !== S.lbl) { S.lbl = lbl; $('zone').textContent = lbl; }
 
-  /* ---- chase indicator: a 100m span, skull for the wall, arrow for you ---- */
+  /* ---- chase indicator: skull for the wall, arrow for you ----
+     The bar spans exactly the trail. Pinning it to a fixed 100m while the wall
+     can never fall further than 60m behind would leave 40% of it permanently
+     dead, and a bar whose left end is unreachable teaches you to ignore it. */
+  const SPAN_M = STORM_TRAIL / PPM;
+  if (S.chaseSpan !== SPAN_M) {
+    S.chaseSpan = SPAN_M;
+    const far = $('chaseFar'); if (far) far.textContent = Math.round(SPAN_M) + ' M';
+  }
   const gapM = (P.x - storm.x) / PPM;
-  const frac = clamp(1 - gapM / 100, 0, 1);              // 0 = 100m back, 1 = on you
+  const frac = clamp(1 - gapM / SPAN_M, 0, 1);           // 0 = a full trail back, 1 = on you
   chaseSkull.style.left = (frac * 100).toFixed(2) + '%';
   const heat = clamp((frac - 0.45) / 0.55, 0, 1);        // reddens as it closes
   chaseFill.style.width = (frac * 100).toFixed(2) + '%';
@@ -2104,6 +2302,23 @@ function drawSolid(s) {
     ctx.fillStyle = 'rgba(191,240,221,.22)'; ctx.fillRect(x, y + 3, w, 4);
     return;
   }
+  if (s.kind === 'brittle') {
+    /* Cracked and paler than the rock either side of it, so the way through is
+       something you can see rather than something you have to be told. */
+    ctx.fillStyle = '#6b6392'; ctx.fillRect(x, y, w, s.h);
+    ctx.fillStyle = '#cbb6e8'; ctx.fillRect(x, y, w, 3);
+    ctx.strokeStyle = 'rgba(30,24,48,.55)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 18; i < w; i += 26) {
+      ctx.moveTo(x + i, y + 2);
+      ctx.lineTo(x + i - 5 + (i % 3) * 4, y + 11);
+      ctx.lineTo(x + i + 3, y + s.h - 1);
+    }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.10)';
+    for (let i = 0; i < w; i += 26) ctx.fillRect(x + i, y + 4, 2, s.h - 6);
+    return;
+  }
   if (s.kind === 'slab') {
     ctx.fillStyle = C.slab; ctx.fillRect(x, y, w, h);
     ctx.fillStyle = C.slabHi; ctx.fillRect(x, y + s.h - 3, w, 3);
@@ -2113,13 +2328,13 @@ function drawSolid(s) {
     }
     return;
   }
-  ctx.fillStyle = s.kind === 'block' ? C.block : C.rock;
+  ctx.fillStyle = (s.kind === 'block' || s.kind === 'gate') ? C.block : C.rock;
   ctx.fillRect(x, y, w, h);
   /* strata */
   ctx.fillStyle = 'rgba(255,255,255,.05)';
   for (let i = 14; i < h; i += 34) ctx.fillRect(x, y + i, w, 2);
   /* neon top edge */
-  const hi = s.kind === 'block' ? C.blockHi : C.edge;
+  const hi = (s.kind === 'block' || s.kind === 'gate') ? C.blockHi : C.edge;
   ctx.fillStyle = hi; ctx.fillRect(x, y, w, 3);
   ctx.fillStyle = 'rgba(191,230,245,.18)'; ctx.fillRect(x, y + 3, w, 7);
   /* side shading only on free-standing pieces; ground tiles butt together seamlessly */
@@ -2325,6 +2540,37 @@ function drawEnemy(e) {
     ctx.fillRect(e.x + 5, e.y + e.h - 6, 8, 6 + lp * 0.3);
     ctx.fillRect(e.x + e.w - 13, e.y + e.h - 6, 8, 6 - lp * 0.3);
     if (e.spiky) drawHeadSpikes({ x: e.x + lean, y: e.y + bob, w: e.w });
+  } else if (e.type === 'gunner') {
+    const chg = clamp(e.charge, 0, 1);
+    const bob = Math.sin(e.t * 6) * 1.5;
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,170,80,' + (0.15 + 0.6 * chg).toFixed(2) + ')';
+    ctx.shadowBlur = 4 + 18 * chg;
+    ctx.fillStyle = '#7d5f8e'; ctx.fillRect(e.x, e.y + 8 + bob, e.w, e.h - 14);
+    ctx.restore();
+    ctx.fillStyle = '#c9a6d8'; ctx.fillRect(e.x, e.y + 8 + bob, e.w, 3);
+    /* eye */
+    ctx.fillStyle = chg > 0.05 ? '#ffd48a' : '#f0d0ff';
+    ctx.fillRect(e.dir > 0 ? e.x + e.w - 12 : e.x + 5, e.y + 14 + bob, 7, 5);
+    /* the gun on its back, pointing the way it means to shoot */
+    ctx.fillStyle = '#5b5378';
+    ctx.fillRect(e.x + 5, e.y + 1 + bob, e.w - 10, 8);
+    ctx.fillStyle = '#8d88b8';
+    ctx.fillRect(e.dir > 0 ? e.x + e.w - 6 : e.x - 12, e.y + 2 + bob, 18, 6);
+    if (chg > 0.05) {
+      ctx.save();
+      ctx.shadowColor = 'rgba(255,190,70,.95)'; ctx.shadowBlur = 4 + 14 * chg;
+      ctx.fillStyle = 'rgb(255,' + Math.round(110 + 120 * chg) + ',70)';
+      const mz = e.dir > 0 ? e.x + e.w + 10 : e.x - 14;
+      ctx.fillRect(mz, e.y + 2 + bob, 5, 6);
+      ctx.restore();
+    }
+    /* legs */
+    ctx.fillStyle = 'rgba(90,64,80,.6)';
+    const gp = Math.sin(e.t * 7) * 4;
+    ctx.fillRect(e.x + 5, e.y + e.h - 6, 8, 6 + gp * 0.4);
+    ctx.fillRect(e.x + e.w - 13, e.y + e.h - 6, 8, 6 - gp * 0.4);
+    if (e.spiky) drawHeadSpikes({ x: e.x, y: e.y + bob, w: e.w });
   } else if (e.type === 'lobber') {
     const chg = clamp(e.charge / LOB_CHARGE, 0, 1);
     ctx.fillStyle = '#635e88';                           /* wall bracket */
@@ -2606,6 +2852,22 @@ function render() {
   /* bullets */
   ctx.save();
   ctx.shadowColor = 'rgba(255,180,80,.9)'; ctx.shadowBlur = 14;
+  /* where a mortar is about to put one - tracks you, then locks as it fires */
+  for (const e of W.enemies) {
+    if (e.type !== 'lobber' || !e.charge || e.aimX === undefined) continue;
+    if (e.aimX > x1 || e.aimX < x0) continue;
+    const c = clamp(e.charge / LOB_CHARGE, 0, 1);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,150,70,' + (0.25 + 0.55 * c).toFixed(2) + ')';
+    ctx.lineWidth = 2;
+    const r = 30 - 13 * c;                               // tightens onto the spot
+    ctx.beginPath(); ctx.ellipse(e.aimX, e.aimY - 3, r, r * 0.36, 0, 0, 7); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(e.aimX - r, e.aimY - 3); ctx.lineTo(e.aimX - r + 8, e.aimY - 3);
+    ctx.moveTo(e.aimX + r, e.aimY - 3); ctx.lineTo(e.aimX + r - 8, e.aimY - 3);
+    ctx.stroke();
+    ctx.restore();
+  }
   /* where each shell is coming down */
   for (const b of W.bullets) {
     if (!b.grav || b.tx === undefined || b.tx > x1 || b.tx < x0) continue;
@@ -2694,7 +2956,7 @@ function bootScene() {
   /* a quiet idle world behind the menu */
   W.solids = []; W.spikes = []; W.enemies = []; W.bullets = []; W.zones = []; W.parts = [];
   W.backs = []; W.drops = []; W.lava = []; W.segs = [];
-  W.genX = 0; W.genY = 0; W.lastType = ''; W.n = 0;
+  W.genX = 0; W.genY = 0; W.lastType = ''; W.lastTurrEnd = -1e9; W.n = 0;
   addGround(-800, 0, 3600);
   W.segs.push({ x0: -800, x1: 2800, killY: 980, id: 'flat' });
   W.genX = 2800; W.genY = 0;
