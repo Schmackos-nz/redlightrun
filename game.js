@@ -305,6 +305,8 @@ const sfx = {
   die:   () => { tone(180, 0.5, 'sawtooth', 0.28, 40); noise(0.5, 0.22, 900); },
   mark:  () => tone(1050, 0.09, 'sine', 0.10, 1400),
   lob:   () => { tone(150, 0.16, 'sine', 0.16, 320); noise(0.1, 0.07, 600); },
+  stomp: () => { tone(320, 0.11, 'square', 0.2, 120); noise(0.12, 0.14, 1100); },
+  spot:  () => tone(210, 0.13, 'sawtooth', 0.11, 430),
   charge: () => { tone(520, 0.2, 'sawtooth', 0.15, 1180); noise(0.09, 0.05, 3000); },
   dive:  () => { tone(700, 0.14, 'square', 0.13, 190); noise(0.08, 0.06, 1600); }
 };
@@ -508,10 +510,23 @@ function pit(x, surfY, w) {           // an opening in the ground: spikes or lav
   else floorSpikes(x + 4, fy, w - 8);
 }
 
-function walker(x, surfY, minX, maxX) {
+/* Anything with spikes on its head cannot be stomped - landing on it kills you
+   instead. Both kinds exist from 110m so you learn to look before you leap. */
+const SPIKY_D = 0.20, CHASER_D = 0.28;
+
+function walker(x, surfY, minX, maxX, spiky) {
   if (x < SAFE_X) return;
   W.enemies.push({ type: 'walker', x: x, y: surfY - 36, w: 30, h: 36,
-    minX, maxX, vx: chance(0.5) ? -95 : 95, t: 0 });
+    minX, maxX, vx: chance(0.5) ? -95 : 95, t: 0, spiky: !!spiky });
+}
+
+/* Sits still until you come near, then runs you down. Slower than you are, so
+   it can always be outrun - but it will follow you a long way. */
+function chaser(x, surfY, spiky) {
+  if (x < SAFE_X) return;
+  W.enemies.push({ type: 'chaser', x: x - 16, y: surfY - 40, w: 32, h: 40,
+    sy: surfY, vx: 0, dir: -1, aggro: false, t: 0,
+    speed: 235, spiky: !!spiky });
 }
 function flyer(x, y, amp, w) {
   if (x < SAFE_X) return;
@@ -588,8 +603,10 @@ function slasher(x, surfY) {
 function segFlat(x, y, d) {
   const w = rnd(340, 640);
   addGround(x, y, w);
-  if (x > SAFE_X && chance(0.3 + 0.35 * d)) {
-    walker(x + w * 0.5, y, x + 50, x + w - 50);
+  if (x > SAFE_X && d > CHASER_D && chance(0.16 + 0.2 * d)) {
+    chaser(x + w * 0.62, y, d > SPIKY_D && chance(0.35));
+  } else if (x > SAFE_X && chance(0.3 + 0.35 * d)) {
+    walker(x + w * 0.5, y, x + 50, x + w - 50, d > SPIKY_D && chance(0.4));
   } else {
     const n = chance(0.55) ? 1 : (d > 0.4 && chance(0.4) ? 2 : 0);
     for (let i = 0; i < n; i++) {
@@ -751,8 +768,8 @@ function segShaftUp(x, y, d) {
   if (d > 0.5 && chance(0.45)) flyer(x + SW * 0.5, y - rise * (steps * 0.5), 46, 90);
   if (d > LOBBER_D && chance(0.5)) {
     const i = 1 + ri(0, Math.max(0, steps - 2));
-    if (chance(0.5)) lobber(x + 40, y - rise * i - 30, 1);
-    else lobber(x + SW - 70, y - rise * i - 30, -1);
+    if (chance(0.5)) lobber(x + 40, y - rise * i - 80, 1);
+    else lobber(x + SW - 70, y - rise * i - 80, -1);
   }
   return { w: SW, y: topY };
 }
@@ -889,7 +906,9 @@ function segClimb(x, y, d) {
     for (let k = 0; k < (many ? 2 : 1); k++) {
       if (!chance(0.75)) continue;
       const i = 2 + ri(0, Math.max(0, steps - 4));
-      const ly = y - rise * i - 30;
+      /* 80 above the rung, not 30: at 30 the muzzle sat inside the box of a
+         player standing on that rung, which was an unavoidable death on landing */
+      const ly = y - rise * i - 80;
       if (chance(0.5)) lobber(x + WALL, ly, 1);
       else lobber(x + w - WALL - 30, ly, -1);
     }
@@ -1177,6 +1196,21 @@ const STORM_TRAIL = 100 * PPM;      // 2000px: the full span of the chase bar
 const BOOST_SHED  = 100 * PPM;      // 100m of progress sheds a full head of steam
 const STALL_GRACE = 0.8;            // pausing to line up a jump is not stalling
 const storm = { x: 0, v: 0, boost: 0, flash: 0 };
+
+/* A stomp bounces you off but does NOT hand back the jump: you may charge out
+   of the bounce, which tops out below a normal charge jump from the ground, so
+   nothing becomes reachable that was not already. */
+const STOMP_V = 560;
+function stompEnemy(e) {
+  e.dead = true;
+  P.vy = -STOMP_V;
+  P.jumps = 1;
+  P.charged = false; P.lift = 0;
+  S.shake = Math.max(S.shake, 5);
+  sfx.stomp();
+  burst(e.x + e.w / 2, e.y + e.h / 2, 16, '#ff8a5c', 280, 0.55);
+  burst(e.x + e.w / 2, e.y + e.h / 2, 8, '#ffd9a0', 170, 0.4);
+}
 
 function part(x, y, vx, vy, life, col, r) {
   if (W.parts.length > 420) return;
@@ -1492,6 +1526,7 @@ function hazards(dt) {
   }
   /* enemies */
   for (const e of W.enemies) {
+    if (e.dead) continue;
     if (e.x > P.x + 260 || e.x + e.w < P.x - 260) continue;
     if (e.type === 'slasher') {
       if (e.phase === 2) {
@@ -1499,13 +1534,22 @@ function hazards(dt) {
         if (aabb(P, blade)) return die('CUT DOWN');
       }
       if (aabb(P, e)) return die('CUT DOWN');
-    } else if (e.type === 'turret') {
-      /* The chassis is scenery. A high shot has to pass through a standing
-         player's box, so the muzzle is unavoidably in the running lane - if the
-         body killed too, every turret would have to be jumped WHILE dodging its
-         own fire. The bullets are the threat; you run straight past the gun. */
+    } else if (e.type === 'turret' || e.type === 'lobber') {
+      /* Guns are scenery. A high shot has to pass through a standing player's
+         box, so the muzzle is unavoidably in the running lane - if the body
+         killed too, every turret would have to be jumped WHILE dodging its own
+         fire, and a wall lobber sits where you have to stand to climb past it.
+         The projectiles are the threat; you walk straight through the gun. */
       continue;
     } else if (aabb(P, e)) {
+      /* Coming down on its head is a stomp, not a death - unless it has spikes
+         up there. Judged from where the feet were BEFORE this step, so clipping
+         a side at speed is still a side hit. */
+      if (P.vy > 0 && (P.py + P.h) <= e.y + 10) {
+        if (e.spiky) return die('LANDED ON ITS SPIKES');
+        stompEnemy(e);
+        continue;
+      }
       return die(e.type === 'flyer' ? 'SWARMED' : 'SOMETHING GOT YOU');
     }
   }
@@ -1566,6 +1610,33 @@ function updateEntities(dt) {
           }
         } else { e.charge = 0; }
       }
+    } else if (e.type === 'chaser') {
+      e.t += dt;
+      const dx = (P.x + P.w / 2) - (e.x + e.w / 2);
+      const dy = Math.abs((P.y + P.h) - (e.y + e.h));
+      if (!e.aggro) { if (Math.abs(dx) < 380 && dy < 150) { e.aggro = true; sfx.spot(); } }
+      else if (Math.abs(dx) > 760 || dy > 320) e.aggro = false;
+
+      /* A watcher's red light freezes them too. Without that, being forced to
+         stand still with one bearing down on you is an unwinnable position. */
+      e.vx = (e.aggro && !redFreeze) ? Math.sign(dx) * e.speed : 0;
+      if (e.vx !== 0) {
+        e.dir = Math.sign(e.vx);
+        const nx = e.x + e.vx * dt;
+        /* stop at a ledge rather than walking into the pit */
+        const probe = e.vx > 0 ? nx + e.w + 4 : nx - 4;
+        let ground = null;
+        for (const s of W.solids) {
+          if (!solidOn(s) || s.kind === 'slab') continue;
+          if (probe < s.x || probe > s.x + s.w) continue;
+          if (s.y < e.y + e.h - 8) continue;
+          if (ground === null || s.y < ground) ground = s.y;
+        }
+        if (ground !== null && Math.abs(ground - (e.y + e.h)) < 26) e.x = nx;
+      }
+      if (e.aggro && chance(0.2))
+        part(e.x + e.w / 2 + rnd(-8, 8), e.y + e.h, rnd(-40, 40), rnd(-40, -8),
+             0.3, '#ff6a8a', 2.4);
     } else if (e.type === 'slasher') {
       e.t += dt;
       const cyc = 2.15;
@@ -1601,6 +1672,7 @@ function updateEntities(dt) {
     b.owner.busy = false; b.owner.cd = b.owner.rest; b.owner = null;
   }
   W.bullets = W.bullets.filter(b => b.life > 0);
+  if (W.enemies.some(e => e.dead)) W.enemies = W.enemies.filter(e => !e.dead);
 
   /* particles */
   for (const p of W.parts) {
@@ -1980,6 +2052,27 @@ function drawLava(l) {
          rnd(0.5, 1.2), chance(0.5) ? '#ffb257' : '#ff7043', rnd(1.6, 3.2));
 }
 
+/* Read at a glance: a spiked head means do not land on it. Same red as the
+   floor spikes, same glow, so the association is immediate. */
+function drawHeadSpikes(e) {
+  ctx.save();
+  ctx.fillStyle = C.spike;
+  ctx.shadowColor = C.spikeGlow; ctx.shadowBlur = 10;
+  const n = Math.max(3, Math.floor(e.w / 9));
+  const step = e.w / n;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = e.x + i * step;
+    ctx.moveTo(x, e.y);
+    ctx.lineTo(x + step / 2, e.y - 9);
+    ctx.lineTo(x + step, e.y);
+  }
+  ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = 'rgba(120,20,35,.8)';
+  ctx.fillRect(e.x, e.y - 1, e.w, 2);
+}
+
 function drawEnemy(e) {
   ctx.save();
   if (e.type === 'walker') {
@@ -1999,6 +2092,7 @@ function drawEnemy(e) {
     const lp = Math.sin(e.t * 11) * 5;
     ctx.fillRect(e.x + 5, e.y + e.h - 5 + bob, 7, 5 + lp * 0.4);
     ctx.fillRect(e.x + e.w - 12, e.y + e.h - 5 + bob, 7, 5 - lp * 0.4);
+    if (e.spiky) drawHeadSpikes({ x: e.x, y: e.y + bob, w: e.w });
   } else if (e.type === 'flyer') {
     const f = Math.sin(e.t * 16);
     ctx.shadowColor = 'rgba(255,90,190,.55)'; ctx.shadowBlur = 16;
@@ -2059,6 +2153,31 @@ function drawEnemy(e) {
     /* charge bar */
     ctx.fillStyle = 'rgba(255,170,60,.18)'; ctx.fillRect(e.x + 6, e.y + e.h - 9, e.w - 12, 4);
     ctx.fillStyle = 'rgba(255,190,90,.95)'; ctx.fillRect(e.x + 6, e.y + e.h - 9, (e.w - 12) * chg, 4);
+  } else if (e.type === 'chaser') {
+    const lean = e.aggro ? e.dir * 3 : 0;
+    const bob = e.aggro ? Math.sin(e.t * 17) * 2 : Math.sin(e.t * 2.2) * 1;
+    ctx.save();
+    ctx.shadowColor = e.aggro ? 'rgba(255,70,110,.75)' : 'rgba(150,70,110,.3)';
+    ctx.shadowBlur = e.aggro ? 18 : 8;
+    ctx.fillStyle = e.aggro ? '#43121f' : '#2a1420';
+    /* a low, forward-leaning body */
+    ctx.beginPath();
+    ctx.moveTo(e.x + lean, e.y + bob);
+    ctx.lineTo(e.x + e.w + lean, e.y + 6 + bob);
+    ctx.lineTo(e.x + e.w, e.y + e.h);
+    ctx.lineTo(e.x, e.y + e.h);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    /* eyes, facing the way it is going */
+    ctx.fillStyle = e.aggro ? '#ff5570' : '#8a5f70';
+    const ex = e.dir > 0 ? e.x + e.w - 13 : e.x + 5;
+    ctx.fillRect(ex, e.y + 10 + bob, 8, 5);
+    /* legs blur when running */
+    ctx.fillStyle = 'rgba(10,6,14,.7)';
+    const lp = Math.sin(e.t * (e.aggro ? 24 : 4)) * (e.aggro ? 7 : 2);
+    ctx.fillRect(e.x + 5, e.y + e.h - 6, 8, 6 + lp * 0.3);
+    ctx.fillRect(e.x + e.w - 13, e.y + e.h - 6, 8, 6 - lp * 0.3);
+    if (e.spiky) drawHeadSpikes({ x: e.x + lean, y: e.y + bob, w: e.w });
   } else if (e.type === 'lobber') {
     const chg = clamp(e.charge / LOB_CHARGE, 0, 1);
     ctx.fillStyle = '#1d2540';                           /* wall bracket */

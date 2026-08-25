@@ -86,6 +86,30 @@ happened, not an approximation. That only works because the course is seeded and
 the sim is deterministic; verified frame-for-frame over a 948-step run with live
 input deliberately jammed during playback. Any key skips.
 
+## Enemies
+
+Landing on an enemy's head **stomps** it: the enemy dies and you bounce at
+560px/s. Side or underneath contact still kills you. The stomp is judged from
+where your feet were *before* the step, so clipping a side at speed is still a
+side hit.
+
+Some walkers and chasers wear **spikes on their head** - same red and glow as the
+floor spikes, so the read is immediate. Landing on one kills you and leaves the
+enemy standing. Both kinds appear from 110m, so you learn to look before leaping.
+
+**Chasers** (from 154m) sit still until you come within 380px, then run you down
+at 235px/s. That is slower than your 330, so they can always be outrun, but they
+follow a long way and only give up past 760px. They stop at ledges rather than
+walking into pits, and a watcher's red light freezes them - without that, being
+forced to stand still with one bearing down on you is unwinnable.
+
+A stomp does not hand back the jump, only the charge. Chaining off a flyer at the
+top of its arc reaches 354px, still under the 460px descent-shaft wall, so
+nothing becomes reachable that was not already.
+
+Turret and lobber chassis are non-lethal to touch - the projectiles are the
+threat. A gun is bolted where you have to stand to get past it.
+
 ## Level generation
 
 The world is streamed in segments about 2600px ahead of the player and pruned
