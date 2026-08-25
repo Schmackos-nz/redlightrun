@@ -6,12 +6,12 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#05060d">
+<meta name="theme-color" content="#332f4d">
 <title>REDLIGHT RUN</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{width:100%;height:100%;overflow:hidden;background:#05060d;
-    font-family:"Segoe UI",Inter,system-ui,sans-serif;color:#dfe6ff;
+  html,body{width:100%;height:100%;overflow:hidden;background:#332f4d;
+    font-family:"Segoe UI",Inter,system-ui,sans-serif;color:#efeaff;
     -webkit-user-select:none;user-select:none;touch-action:none}
   #wrap{position:fixed;inset:0}
   canvas{display:block;width:100%;height:100%}
@@ -70,13 +70,13 @@
   #lightTxt{font-size:12px;letter-spacing:.26em;font-weight:700;opacity:.85}
 
   /* ---------- Panels ---------- */
-  .panel{background:linear-gradient(160deg,rgba(16,20,38,.94),rgba(8,10,22,.96));
-    border:1px solid rgba(140,170,255,.18);border-radius:18px;padding:30px 34px;
+  .panel{background:linear-gradient(160deg,rgba(72,66,104,.95),rgba(52,47,80,.97));
+    border:1px solid rgba(206,196,245,.28);border-radius:18px;padding:30px 34px;
     box-shadow:0 30px 80px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.06);
     max-width:min(94vw,720px);width:100%;text-align:center}
   .title{font-size:clamp(34px,7vw,64px);font-weight:900;letter-spacing:.06em;line-height:.95}
-  .title .r{color:#ff5566;text-shadow:0 0 26px rgba(255,60,80,.6)}
-  .title .g{color:#4dffa0;text-shadow:0 0 26px rgba(60,255,150,.5)}
+  .title .r{color:#ff9aa9;text-shadow:0 0 26px rgba(255,150,170,.55)}
+  .title .g{color:#a8f5cd;text-shadow:0 0 26px rgba(168,245,205,.5)}
   .sub{margin-top:10px;font-size:13px;opacity:.6;letter-spacing:.2em}
 
   .keys{margin:24px auto 6px;display:grid;
@@ -90,7 +90,7 @@
   .klbl{font-size:12.5px;line-height:1.4;opacity:.72;min-width:0;overflow-wrap:break-word}
   .klbl em{font-style:normal;opacity:.62}
   .kb{display:inline-block;min-width:23px;text-align:center;padding:3px 6px;border-radius:5px;
-    background:rgba(150,180,255,.14);border:1px solid rgba(150,180,255,.22);
+    background:rgba(206,196,245,.18);border:1px solid rgba(206,196,245,.3);
     font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap;line-height:1.1}
   .kplus{opacity:.4;font-size:11px;align-self:center}
 
@@ -102,23 +102,23 @@
   .btn{margin-top:24px;pointer-events:auto;cursor:pointer;border:0;
     font:inherit;font-weight:800;letter-spacing:.16em;font-size:14px;
     padding:14px 34px;border-radius:12px;color:#040a14;
-    background:linear-gradient(180deg,#79e0ff,#3aa8ff);
-    box-shadow:0 10px 30px rgba(60,150,255,.35);transition:transform .1s,box-shadow .1s}
-  .btn:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(60,150,255,.5)}
+    background:linear-gradient(180deg,#cdeeff,#9fd4f5);
+    box-shadow:0 10px 30px rgba(160,210,245,.3);transition:transform .1s,box-shadow .1s}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(160,210,245,.45)}
   .btn:active{transform:translateY(1px)}
-  .btn.ghost{background:transparent;color:#9fb4e6;border:1px solid rgba(160,190,255,.28);
+  .btn.ghost{background:transparent;color:#cdc4ee;border:1px solid rgba(206,196,245,.34);
     box-shadow:none;margin-left:10px}
   .btn.ghost:hover{background:rgba(160,190,255,.08)}
 
   /* ---------- Death ---------- */
-  #dTitle{font-size:clamp(28px,6vw,48px);font-weight:900;letter-spacing:.08em;color:#ff6070;
-    text-shadow:0 0 30px rgba(255,60,80,.55)}
+  #dTitle{font-size:clamp(28px,6vw,48px);font-weight:900;letter-spacing:.08em;color:#ff9aa9;
+    text-shadow:0 0 30px rgba(255,150,170,.5)}
   #dCause{margin-top:8px;font-size:13px;letter-spacing:.2em;opacity:.6}
   #dScore{margin-top:22px;font-size:clamp(46px,10vw,78px);font-weight:900;line-height:1;
     font-variant-numeric:tabular-nums;text-shadow:0 0 30px rgba(120,180,255,.45)}
   #dScoreLbl{font-size:11px;letter-spacing:.3em;opacity:.45;margin-top:4px}
   #dBest{margin-top:14px;font-size:13px;opacity:.6;letter-spacing:.12em}
-  #newRec{display:none;margin-top:14px;color:#ffd166;font-weight:800;letter-spacing:.2em;
+  #newRec{display:none;margin-top:14px;color:#ffe1a3;font-weight:800;letter-spacing:.2em;
     font-size:13px;animation:pulse 1s infinite alternate}
   @keyframes pulse{from{opacity:.55}to{opacity:1}}
   #nameRow{display:none;margin-top:16px;gap:10px;align-items:center;justify-content:center}
@@ -133,7 +133,7 @@
   .row{display:flex;align-items:center;gap:10px;padding:6px 12px;border-radius:8px;
     font-size:13px;font-variant-numeric:tabular-nums}
   .row:nth-child(odd){background:rgba(255,255,255,.035)}
-  .row.me{background:rgba(255,209,102,.14);box-shadow:inset 0 0 0 1px rgba(255,209,102,.3)}
+  .row.me{background:rgba(255,225,163,.16);box-shadow:inset 0 0 0 1px rgba(255,225,163,.34)}
   .row .rk{width:26px;opacity:.45;font-weight:700}
   .row .nm{flex:1;text-align:left;letter-spacing:.2em;font-weight:700;opacity:.9}
   .row .sc{font-weight:800}
@@ -152,22 +152,32 @@
   .tb.act{background:rgba(120,200,255,.34);border-color:rgba(150,220,255,.6);
     color:#eaf7ff;transform:scale(.94)}
   .tb small{font-size:9px;letter-spacing:.14em;opacity:.6;position:absolute;bottom:9px}
-  /* left thumb: movement.  right thumb: jump and crouch. */
-  #tL{left:max(16px,env(safe-area-inset-left));bottom:22px;width:88px;height:88px}
-  #tR{left:calc(max(16px,env(safe-area-inset-left)) + 100px);bottom:22px;width:88px;height:88px}
-  #tJ{right:max(16px,env(safe-area-inset-right));bottom:22px;width:112px;height:112px;font-size:32px}
-  #tC{right:calc(max(16px,env(safe-area-inset-right)) + 124px);bottom:22px;width:88px;height:88px}
-  @media (max-height:420px){
+  /* left thumb: an analog stick.  right thumb: jump and crouch. */
+  #stick{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:20px;
+    width:148px;height:148px;border-radius:50%;
+    background:radial-gradient(circle at 50% 50%,rgba(206,196,245,.10),rgba(206,196,245,.05));
+    border:2px solid rgba(206,196,245,.22);box-shadow:0 6px 24px rgba(0,0,0,.28)}
+  #stick .ring{position:absolute;inset:26px;border-radius:50%;
+    border:1px dashed rgba(206,196,245,.18)}
+  #knob{position:absolute;left:50%;top:50%;width:62px;height:62px;margin:-31px 0 0 -31px;
+    border-radius:50%;background:rgba(206,240,255,.34);
+    border:2px solid rgba(220,245,255,.6);box-shadow:0 3px 14px rgba(0,0,0,.3);
+    transition:background .06s}
+  #stick.act #knob{background:rgba(206,240,255,.55)}
+  #tJ{right:max(18px,env(safe-area-inset-right));bottom:26px;width:118px;height:118px;font-size:32px}
+  #tC{right:calc(max(18px,env(safe-area-inset-right)) + 130px);bottom:26px;width:92px;height:92px}
+  @media (max-height:430px){
     .tb{box-shadow:none}
-    #tL,#tR,#tC{width:76px;height:76px}
-    #tJ{width:96px;height:96px}
-    #tR{left:calc(max(16px,env(safe-area-inset-left)) + 86px)}
-    #tC{right:calc(max(16px,env(safe-area-inset-right)) + 106px)}
+    #stick{width:124px;height:124px;bottom:14px}
+    #knob{width:54px;height:54px;margin:-27px 0 0 -27px}
+    #tC{width:80px;height:80px;bottom:18px;
+      right:calc(max(18px,env(safe-area-inset-right)) + 112px)}
+    #tJ{width:102px;height:102px;bottom:18px}
   }
 
   /* ---------- Rotate prompt ---------- */
   #rotate{position:absolute;inset:0;display:none;z-index:40;
-    background:#05060d;color:#dfe6ff;
+    background:#332f4d;color:#efeaff;
     align-items:center;justify-content:center;flex-direction:column;gap:18px;text-align:center;padding:30px}
   #rotate.on{display:flex}
   #rotate .ph{width:64px;height:104px;border:3px solid rgba(160,200,255,.6);border-radius:12px;
@@ -178,6 +188,37 @@
 
   #fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;
     transition:opacity .18s}
+
+  /* A phone held sideways has ~380px of height. The full panel does not fit, so
+     on short screens it becomes a compact two-column card: the controls list and
+     the rules are collapsed behind a toggle, leaving the title, the button and
+     the scores. */
+  @media (max-height:560px){
+    .layer{padding:8px 0}
+    .panel{padding:14px 16px;border-radius:14px;max-width:min(96vw,680px)}
+    .title{font-size:clamp(26px,6vw,40px)}
+    .sub{margin-top:5px;font-size:10px;letter-spacing:.14em}
+    .keys{margin:10px auto 2px;gap:0 14px;max-width:100%}
+    .krow{padding:3px 2px}
+    .klbl{font-size:11px;line-height:1.25}
+    .kcaps{min-width:78px}
+    .rules{margin-top:8px;font-size:11px;line-height:1.5}
+    .btn{margin-top:12px;padding:11px 26px;font-size:13px}
+    .scores{margin-top:12px}
+    .scores h3{margin-bottom:5px}
+    .row{padding:3px 10px;font-size:12px}
+    #dScore{margin-top:10px;font-size:clamp(34px,9vw,52px)}
+    #dBest{margin-top:8px}
+    #newRec{margin-top:8px}
+    #nameRow{margin-top:9px}
+    /* collapsed by default, opened by the HOW TO PLAY toggle */
+    .panel.lite .keys, .panel.lite .rules{display:none}
+    #helpBtn{display:inline-block}
+  }
+  #helpBtn{display:none;margin-top:10px;cursor:pointer;pointer-events:auto;
+    background:none;border:1px solid rgba(206,196,245,.3);color:#cdc4ee;
+    font:inherit;font-size:11px;font-weight:800;letter-spacing:.18em;
+    padding:7px 16px;border-radius:999px}
 
   @media (max-width:520px){
     .panel{padding:22px 16px;border-radius:14px}
@@ -219,13 +260,13 @@
   </div>
 
   <div id="menu" class="layer on">
-    <div class="panel">
+    <div class="panel" id="menuPanel">
       <div class="title"><span class="r">REDLIGHT</span> <span class="g">RUN</span></div>
       <div class="sub">SAME COURSE EVERY RUN &middot; LEARN IT &middot; BEAT IT</div>
       <div class="keys">
         <div class="krow">
           <span class="kcaps"><span class="kb">A</span><span class="kb">D</span></span>
-          <span class="klbl">Move <em>&mdash; or arrows</em></span>
+          <span class="klbl">Move <em>&mdash; or arrows &middot; stick on mobile</em></span>
         </div>
         <div class="krow">
           <span class="kcaps"><span class="kb">SPACE</span></span>
@@ -263,6 +304,7 @@
         &#9679; The course never changes, so every metre is a fair comparison.
       </div>
       <button class="btn" id="playBtn">START RUN</button>
+      <button id="helpBtn">HOW TO PLAY</button>
       <div id="scores" class="scores"></div>
     </div>
   </div>
@@ -286,8 +328,7 @@
   </div>
 
   <div id="touch">
-    <div class="tb" id="tL">&#9664;</div>
-    <div class="tb" id="tR">&#9654;</div>
+    <div id="stick"><div class="ring"></div><div id="knob"></div></div>
     <div class="tb" id="tC">&#9660;<small>DUCK</small></div>
     <div class="tb" id="tJ">&#9650;<small>JUMP</small></div>
   </div>

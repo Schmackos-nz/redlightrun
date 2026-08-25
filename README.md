@@ -21,10 +21,23 @@ fixed) course.
 | `R` | restart | 
 | `M` | mute |
 
+## Look
+
+Pastel world, vivid hazards. Terrain, sky and furniture are chalky and
+low-chroma (0.12-0.21) so everything that can kill you - spikes, lava, shells,
+the watcher, the storm - keeps its saturation (0.46-0.82) and reads instantly.
+The gap between the softest hazard and the boldest piece of terrain is 0.25
+chroma, which is the property worth preserving if you retune anything.
+
 ## On a phone
 
-Touch controls appear automatically on any coarse-pointer device: two movement
-pads under the left thumb, JUMP and DUCK under the right. A single global touch
+Touch controls appear automatically on any coarse-pointer device: an **analog
+stick** under the left thumb, JUMP and DUCK under the right. The stick reads a
+direction rather than an on/off press, so you can swing across it to turn round
+without lifting off, and how far you push it scales your speed - a half push
+walks. Pulling it straight down ducks, so the thumb never has to leave it.
+On a short screen (a phone held sideways is about 380px tall) the menu collapses
+to a compact card with the controls behind a HOW TO PLAY toggle. A single global touch
 tracker handles them rather than per-button listeners, so several fingers work at
 once and sliding a thumb from one pad to another hands over cleanly instead of
 leaving the first stuck down. Starting a run requests fullscreen and tries to
