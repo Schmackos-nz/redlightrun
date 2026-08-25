@@ -112,9 +112,15 @@ enemy standing. Both kinds appear from 110m, so you learn to look before leaping
 
 **Chasers** (from 154m) sit still until you come within 380px, then run you down
 at 235px/s. That is slower than your 330, so they can always be outrun, but they
-follow a long way and only give up past 760px. They stop at ledges rather than
-walking into pits, and a watcher's red light freezes them - without that, being
-forced to stand still with one bearing down on you is unwinnable.
+follow a long way and only give up past 760px. A watcher's red light freezes them
+- without that, being forced to stand still with one bearing down on you is
+unwinnable.
+
+They collide with the world properly: gravity, ground, and walls. A chaser hops
+anything up to **95px** tall and is stopped flat by anything higher, so a low
+block is no shelter but a pillar, a cover block or a shaft wall is - put one
+between you and it and you are safe. They still refuse to step off a ledge, and
+one-way platforms never block them sideways.
 
 A stomp does not hand back the jump, only the charge. Chaining off a flyer at the
 top of its arc reaches 354px, still under the 460px descent-shaft wall, so

@@ -574,11 +574,40 @@ function walker(x, surfY, minX, maxX, spiky) {
 
 /* Sits still until you come near, then runs you down. Slower than you are, so
    it can always be outrun - but it will follow you a long way. */
+/* A chaser can hop something up to CH_STEP tall and is stopped flat by anything
+   higher, so a low block is no shelter but a pillar or a shaft wall is. */
+const CH_GRAV = 2400, CH_JUMP_V = 700, CH_STEP = 95;
+
 function chaser(x, surfY, spiky) {
   if (x < SAFE_X) return;
   W.enemies.push({ type: 'chaser', x: x - 16, y: surfY - 40, w: 32, h: 40,
-    sy: surfY, vx: 0, dir: -1, aggro: false, t: 0,
+    sy: surfY, vx: 0, vy: 0, dir: -1, aggro: false, onGround: true, t: 0,
     speed: 235, spiky: !!spiky });
+}
+
+/* The top of whatever would block this box at nx, or null if the way is clear.
+   One-way platforms never block sideways - you pass through their edges. */
+function blockingTop(e, nx) {
+  const box = { x: nx, y: e.y, w: e.w, h: e.h };
+  let top = null;
+  for (const s of W.solids) {
+    if (s.oneWay || !solidOn(s)) continue;
+    if (!aabb(box, s)) continue;
+    if (top === null || s.y < top) top = s.y;
+  }
+  return top;
+}
+/* The surface an enemy would be standing on just past its leading edge. */
+function groundAhead(e, nx, dir) {
+  const probe = dir > 0 ? nx + e.w + 4 : nx - 4;
+  let g = null;
+  for (const s of W.solids) {
+    if (!solidOn(s) || s.kind === 'slab') continue;
+    if (probe < s.x || probe > s.x + s.w) continue;
+    if (s.y < e.y + e.h - 8) continue;
+    if (g === null || s.y < g) g = s.y;
+  }
+  return g;
 }
 function flyer(x, y, amp, w) {
   if (x < SAFE_X) return;
@@ -1716,20 +1745,41 @@ function updateEntities(dt) {
 
       /* A watcher's red light freezes them too. Without that, being forced to
          stand still with one bearing down on you is an unwinnable position. */
-      e.vx = (e.aggro && !redFreeze) ? Math.sign(dx) * e.speed : 0;
-      if (e.vx !== 0) {
-        e.dir = Math.sign(e.vx);
+      const want = (e.aggro && !redFreeze) ? Math.sign(dx) : 0;
+      e.vx = want * e.speed;
+
+      /* ---- fall and land ---- */
+      e.vy += CH_GRAV * dt;
+      if (e.vy > 1400) e.vy = 1400;
+      const prevBot = e.y + e.h;
+      e.y += e.vy * dt;
+      e.onGround = false;
+      for (const s of W.solids) {
+        if (!solidOn(s) || s.kind === 'slab') continue;
+        if (!aabb(e, s)) continue;
+        if (s.oneWay) {
+          if (e.vy >= 0 && prevBot <= s.y + 2) { e.y = s.y - e.h; e.vy = 0; e.onGround = true; }
+        } else if (e.vy > 0) { e.y = s.y - e.h; e.vy = 0; e.onGround = true; }
+        else if (e.vy < 0) { e.y = s.y + s.h; e.vy = 0; }
+      }
+
+      /* ---- move, or hop what is in the way ---- */
+      if (want !== 0) {
+        e.dir = want;
         const nx = e.x + e.vx * dt;
-        /* stop at a ledge rather than walking into the pit */
-        const probe = e.vx > 0 ? nx + e.w + 4 : nx - 4;
-        let ground = null;
-        for (const s of W.solids) {
-          if (!solidOn(s) || s.kind === 'slab') continue;
-          if (probe < s.x || probe > s.x + s.w) continue;
-          if (s.y < e.y + e.h - 8) continue;
-          if (ground === null || s.y < ground) ground = s.y;
+        const top = blockingTop(e, nx);
+        if (top === null) {
+          /* airborne it may cross a gap; on foot it will not step off a ledge */
+          if (!e.onGround) e.x = nx;
+          else {
+            const g = groundAhead(e, nx, want);
+            if (g !== null && Math.abs(g - (e.y + e.h)) < 26) e.x = nx;
+          }
+        } else if (e.onGround) {
+          const climb = (e.y + e.h) - top;               // how far above its feet
+          if (climb > 0 && climb <= CH_STEP) e.vy = -CH_JUMP_V;   // hop it
+          /* anything taller simply stops it */
         }
-        if (ground !== null && Math.abs(ground - (e.y + e.h)) < 26) e.x = nx;
       }
       if (e.aggro && chance(0.2))
         part(e.x + e.w / 2 + rnd(-8, 8), e.y + e.h, rnd(-40, 40), rnd(-40, -8),
