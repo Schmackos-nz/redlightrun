@@ -593,7 +593,7 @@ function segFlat(x, y, d) {
   } else {
     const n = chance(0.55) ? 1 : (d > 0.4 && chance(0.4) ? 2 : 0);
     for (let i = 0; i < n; i++) {
-      const bh = rnd(45, 95 + 115 * d);                  // tops out at 210; double jump lifts the feet 228
+      const bh = rnd(45, 95 + 115 * d);                  // tops out at 210; a charge jump lifts the feet 228
       addSolid(x + 100 + (w - 240) * (n === 1 ? rnd(0.15, 0.85) : i / n + 0.1),
                y - bh, rnd(32, 58), bh, 'block');
     }
@@ -606,7 +606,7 @@ function segGaps(x, y, d) {
   addGround(cx, cy, 110); cx += 110;
   const n = 2 + ri(0, 1) + Math.floor(d * 2);
   for (let i = 0; i < n; i++) {
-    const gap = rnd(115, 175 + 85 * d);                  // max 260, double jump carries 327
+    const gap = rnd(115, 175 + 85 * d);                  // max 260, a charge jump carries 360
     pit(cx, cy, gap); cx += gap;
     /* a step up is only fair if the gap itself is short */
     const step = chance(0.42) ? (chance(0.5) && gap < 195 ? -60 : 60) : 0;
@@ -831,10 +831,10 @@ function segGauntlet(x, y, d) {
        A crouch hop (106) is the faster optional line, not a requirement. */
     const gapw = rnd(155, 215);
     addGround(cx, y, gapw);
-    /* A ceiling over the landing zone says "do not double jump here", and that
-       is all it says. CEIL_CLEAR leaves room for a full standing jump (feet 120
-       + 46 of player = 166) so the hop is never a precision input, while a
-       double jump (274) still bonks. It stops at the far edge of the gap, so the
+    /* A ceiling over the landing zone says "do not charge here", and that is all
+       it says. CEIL_CLEAR leaves room for a full plain jump (feet 120 + 46 of
+       player = 166) so the hop is never a precision input, while a charge jump
+       (228 + 46 = 274) still bonks. It stops at the far edge of the gap, so the
        take-off for the next patch always has open sky above it. */
     if (d > CEIL_D && chance(0.3 + 0.3 * d))
       addSolid(cx - 10, y - CEIL_CLEAR - 120, gapw + 10, 120, 'slab');
@@ -956,7 +956,7 @@ function segLift(x, y, d) {
      itself instead and leaves the descending segments to bring things back. */
   if (heightAbove() > 900 || chance(0.5)) {
     /* ---- horizontal ferry over a chasm ---- */
-    const gap = rnd(470, 600 + 90 * d);                  // double jump only carries 327
+    const gap = rnd(470, 600 + 90 * d);                  // a charge jump only carries 360
     pit(cx, y, gap);
     const pw = 124;
     const amp = (gap - pw) / 2 + 34;                     // overlaps both ledges
@@ -1412,8 +1412,8 @@ function physics(dt) {
     }
   }
   /* ---- charge jump ---- */
-  /* jumps === 1 means this is still the ground jump: the charge is never
-     available off a double jump, only in addition to one */
+  /* jumps === 1 means both feet left the ground on a real jump, not a fall off
+     a ledge, so a coyote-time step into thin air cannot be charged */
   /* Not off a crouch hop: that hop exists to stay LOW under a tight ceiling, and
      lifting it to 159px would defeat the one thing it is for. */
   if (jumpHeld && !P.onGround && !P.crouch && !P.charged && P.jumps === 1 && P.vy >= 0) {
