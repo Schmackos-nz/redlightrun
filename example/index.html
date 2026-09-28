@@ -436,7 +436,6 @@ const sel = document.getElementById('service');
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.getElementById('town'), holder = document.getElementById('rooms');
   const room = document.getElementById('room'), roomBody = room.querySelector('.room-body');
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const PLACES = [
     {id:'services', name:'Services', roof:'#e8491d', icon:'🔧'},
     {id:'about', name:'About us', roof:'#3b6fb6', icon:'🏠'},
@@ -585,7 +584,6 @@ const sel = document.getElementById('service');
     if (!stops[id]) return;
     if (state === 'walkOut' || state === 'inside') return;
     if (state === 'walkBack'){ pending = id; return; }
-    if (reduce){ me.s = stops[id]; here = id; openRoom(id); return; }
     Object.values(bld).forEach(b => b.g.classList.remove('target'));
     if (here === id && state === 'idle'){ arrive(id); return; }
     target = id; here = null; state = 'driving';
@@ -612,7 +610,6 @@ const sel = document.getElementById('service');
     history.replaceState(null, '', location.pathname + location.search);
     if (!here) { state = 'idle'; return; }
     bld[here].doorEl.classList.remove('open');
-    if (reduce){ state = 'idle'; flush(); return; }
     const c = pose(me.s, me.lane);
     state = 'walkBack';
     walk = {from:bld[here].door, to:{x:c.x, y:c.y}, t:0};
