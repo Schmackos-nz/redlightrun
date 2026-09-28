@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torque &amp; Tread Automotive</title>
+<meta name="description" content="Example mechanic website — servicing, WOFs, brakes, tyres and diagnostics.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f5f2; --surface:#ffffff; --ink:#16181c; --muted:#5d636d; --line:#e2e0db;
+  --brand:#e8491d; --brand-ink:#ffffff; --dark:#15171b; --dark-2:#1f2227;
+  --radius:12px; --shadow:0 10px 30px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,sans-serif}
+img{max-width:100%;display:block}
+a{color:inherit}
+h1,h2,h3{font-family:Oswald,Impact,sans-serif;letter-spacing:.02em;line-height:1.15;margin:0 0 .5em;text-transform:uppercase}
+h2{font-size:clamp(1.8rem,4vw,2.6rem)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+section{padding:80px 0}
+.eyebrow{color:var(--brand);font-weight:600;text-transform:uppercase;letter-spacing:.12em;font-size:.8rem;margin-bottom:.4em}
+.lead{color:var(--muted);max-width:640px}
+.btn{display:inline-block;background:var(--brand);color:var(--brand-ink);text-decoration:none;font-weight:600;padding:.8em 1.5em;border-radius:999px;border:0;cursor:pointer;font-size:1rem;transition:transform .15s,filter .15s}
+.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn.ghost{background:transparent;border:2px solid currentColor;color:#fff}
+
+/* ---------- top bar + nav ---------- */
+.topbar{background:var(--dark);color:#c9ccd2;font-size:.85rem}
+.topbar .wrap{display:flex;gap:24px;justify-content:space-between;padding-top:8px;padding-bottom:8px;flex-wrap:wrap}
+.topbar a{text-decoration:none;color:#fff}
+header.nav{position:sticky;top:0;z-index:50;background:rgba(21,23,27,.96);backdrop-filter:blur(6px);color:#fff}
+header.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:68px}
+.logo{display:flex;align-items:center;gap:10px;font-family:Oswald,sans-serif;font-size:1.35rem;text-transform:uppercase;text-decoration:none;letter-spacing:.04em}
+.logo svg{width:34px;height:34px;color:var(--brand)}
+.logo span{color:var(--brand)}
+nav ul{list-style:none;display:flex;gap:28px;margin:0;padding:0}
+nav a{text-decoration:none;font-weight:500;opacity:.85}
+nav a:hover{opacity:1;color:var(--brand)}
+.menu-btn{display:none;background:none;border:0;color:#fff;font-size:1.6rem;cursor:pointer}
+
+/* ---------- carousel ---------- */
+.hero{position:relative;height:min(82vh,720px);min-height:460px;overflow:hidden;background:var(--dark);padding:0}
+.slides{height:100%;display:flex;transition:transform .7s cubic-bezier(.65,0,.35,1)}
+.slide{flex:0 0 100%;position:relative;height:100%}
+.slide img{width:100%;height:100%;object-fit:cover}
+.slide.noimg{background:linear-gradient(135deg,#2a2d33,#0f1013)}
+.slide::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(10,11,13,.85) 0%,rgba(10,11,13,.45) 55%,rgba(10,11,13,.1) 100%)}
+.caption{position:absolute;inset:0;z-index:2;display:flex;align-items:center}
+.caption .wrap{width:100%;color:#fff}
+.caption h1{font-size:clamp(2.2rem,6vw,4.4rem);max-width:720px}
+.caption p{max-width:520px;color:#d6d8dc;font-size:1.1rem}
+.caption .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:1.4em}
+.car-tag{display:inline-block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);padding:.25em .8em;border-radius:999px;font-size:.8rem;margin-bottom:1em}
+.arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:3;width:48px;height:48px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff;font-size:1.5rem;cursor:pointer;backdrop-filter:blur(4px)}
+.arrow:hover{background:var(--brand)}
+.arrow.prev{left:16px}.arrow.next{right:16px}
+.dots{position:absolute;bottom:22px;left:0;right:0;z-index:3;display:flex;justify-content:center;gap:10px}
+.dots button{width:12px;height:12px;border-radius:999px;border:0;background:rgba(255,255,255,.4);cursor:pointer;padding:0;transition:width .3s,background .3s}
+.dots button.on{width:34px;background:var(--brand)}
+.shuffle{position:absolute;top:16px;right:16px;z-index:3;background:rgba(0,0,0,.45);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:.4em 1em;cursor:pointer;font:inherit;font-size:.85rem}
+.shuffle:hover{background:var(--brand)}
+
+/* ---------- trust strip ---------- */
+.strip{background:var(--brand);color:#fff;padding:22px 0}
+.strip .wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;text-align:center}
+.strip b{display:block;font-family:Oswald,sans-serif;font-size:2rem;line-height:1}
+.strip small{opacity:.9}
+
+/* ---------- services ---------- */
+.grid{display:grid;gap:22px}
+.services .grid{grid-template-columns:repeat(3,1fr);margin-top:36px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:28px;transition:transform .2s,box-shadow .2s}
+.card:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.card .ico{width:52px;height:52px;border-radius:12px;background:#fdebe5;color:var(--brand);display:grid;place-items:center;margin-bottom:16px}
+.card .ico svg{width:28px;height:28px}
+.card h3{font-size:1.25rem}
+.card p{color:var(--muted);margin:0 0 12px}
+.card .from{font-weight:600}
+
+/* ---------- about ---------- */
+.about{background:var(--dark);color:#fff}
+.about .wrap{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+.about .lead{color:#b9bdc4}
+.about img{border-radius:var(--radius);aspect-ratio:4/3;object-fit:cover;width:100%;background:var(--dark-2)}
+.checks{list-style:none;padding:0;margin:24px 0 0;display:grid;gap:12px}
+.checks li{display:flex;gap:12px;align-items:flex-start}
+.checks li::before{content:"✓";flex:0 0 26px;height:26px;border-radius:50%;background:var(--brand);display:grid;place-items:center;font-weight:700;font-size:.85rem}
+
+/* ---------- pricing ---------- */
+.pricing .grid{grid-template-columns:repeat(3,1fr);margin-top:36px;align-items:stretch}
+.plan{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:32px;display:flex;flex-direction:column}
+.plan.best{border:2px solid var(--brand);position:relative;box-shadow:var(--shadow)}
+.plan.best::before{content:"Most popular";position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--brand);color:#fff;font-size:.75rem;font-weight:600;padding:.2em .9em;border-radius:999px;text-transform:uppercase;letter-spacing:.08em}
+.plan .price{font-family:Oswald,sans-serif;font-size:2.6rem;margin:.2em 0}
+.plan .price small{font-size:1rem;color:var(--muted);font-family:Inter,sans-serif}
+.plan ul{padding:0;list-style:none;margin:12px 0 24px;flex:1}
+.plan li{padding:8px 0;border-bottom:1px dashed var(--line);color:var(--muted)}
+.plan li::before{content:"• ";color:var(--brand)}
+
+/* ---------- process ---------- */
+.steps{counter-reset:s;grid-template-columns:repeat(4,1fr);margin-top:36px}
+.step{position:relative;padding-top:56px}
+.step::before{counter-increment:s;content:counter(s,decimal-leading-zero);position:absolute;top:0;left:0;font-family:Oswald,sans-serif;font-size:2.4rem;color:var(--brand)}
+.step p{color:var(--muted);margin:0}
+
+/* ---------- testimonials ---------- */
+.reviews{background:#efece6}
+.reviews .grid{grid-template-columns:repeat(3,1fr);margin-top:36px}
+.quote{background:var(--surface);border-radius:var(--radius);padding:28px;box-shadow:0 2px 0 var(--line)}
+.stars{color:#f5a623;letter-spacing:2px}
+.quote p{font-style:italic}
+.who{display:flex;align-items:center;gap:12px;margin-top:12px}
+.avatar{width:42px;height:42px;border-radius:50%;background:var(--dark);color:#fff;display:grid;place-items:center;font-weight:600}
+
+/* ---------- faq ---------- */
+.faq .wrap{display:grid;grid-template-columns:1fr 1.4fr;gap:56px}
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin-bottom:12px}
+summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:12px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--brand);font-size:1.4rem;line-height:1}
+details[open] summary::after{content:"–"}
+details p{color:var(--muted);margin:.8em 0 0}
+
+/* ---------- contact ---------- */
+.contact{background:var(--dark);color:#fff}
+.contact .wrap{display:grid;grid-template-columns:1fr 1.3fr;gap:56px}
+.contact .lead{color:#b9bdc4}
+.info{display:grid;gap:18px;margin-top:28px}
+.info div{display:flex;gap:14px}
+.info svg{flex:0 0 22px;width:22px;height:22px;color:var(--brand);margin-top:3px}
+.hours{width:100%;border-collapse:collapse;margin-top:24px;font-size:.95rem}
+.hours td{padding:6px 0;border-bottom:1px solid #2c3036}
+.hours td:last-child{text-align:right;color:#c9ccd2}
+.hours tr.today td{color:var(--brand);font-weight:600}
+form{background:var(--surface);color:var(--ink);border-radius:var(--radius);padding:32px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+form .full{grid-column:1/-1}
+label{display:block;font-size:.85rem;font-weight:600;margin-bottom:6px}
+input,select,textarea{width:100%;font:inherit;padding:.75em .9em;border:1px solid var(--line);border-radius:8px;background:#fbfaf8;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px;border-color:transparent}
+textarea{min-height:120px;resize:vertical}
+.err{color:#c62d0e;font-size:.8rem;min-height:1em;display:block;margin-top:4px}
+.invalid{border-color:#c62d0e}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips label{font-weight:500;margin:0;display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:.35em .9em;cursor:pointer;font-size:.9rem}
+.chips input{width:auto;margin:0;accent-color:var(--brand)}
+.chips label:has(input:checked){border-color:var(--brand);background:#fdebe5}
+.sent{grid-column:1/-1;text-align:center;padding:24px 0;display:none}
+.sent.show{display:block}
+.sent .big{font-size:3rem}
+.map{margin-top:28px;border-radius:var(--radius);overflow:hidden;height:220px;background:var(--dark-2)}
+.map iframe{width:100%;height:100%;border:0;filter:grayscale(1) invert(.9) contrast(.9)}
+
+footer{background:#0d0e10;color:#8d929b;padding:36px 0;font-size:.9rem}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.note{font-size:.8rem;opacity:.7}
+
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .6s,transform .6s}
+.reveal.in{opacity:1;transform:none}
+
+@media (max-width:900px){
+  .services .grid,.pricing .grid,.reviews .grid{grid-template-columns:1fr 1fr}
+  .steps{grid-template-columns:1fr 1fr}
+  .about .wrap,.faq .wrap,.contact .wrap{grid-template-columns:1fr;gap:36px}
+}
+@media (max-width:720px){
+  section{padding:56px 0}
+  .menu-btn{display:block}
+  nav ul{position:absolute;top:68px;left:0;right:0;background:var(--dark);flex-direction:column;gap:0;padding:8px 16px 16px;display:none}
+  nav ul.open{display:flex}
+  nav li a{display:block;padding:12px 0;border-bottom:1px solid #2c3036}
+  .services .grid,.pricing .grid,.reviews .grid,.steps{grid-template-columns:1fr}
+  .strip .wrap{grid-template-columns:1fr 1fr}
+  form{grid-template-columns:1fr;padding:22px}
+  .arrow{display:none}
+  .topbar .hide-sm{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .slides,.reveal{transition:none}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <span>📍 42 Piston Lane, Auckland</span>
+    <span class="hide-sm">Mon–Fri 7:30–5:30 · Sat 8–12</span>
+    <a href="tel:0800867835">📞 0800 TORQUE</a>
+  </div>
+</div>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="#top">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      Torque<span>&amp;</span>Tread
+    </a>
+    <button class="menu-btn" aria-label="Menu" aria-expanded="false">☰</button>
+    <nav><ul>
+      <li><a href="#services">Services</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+      <li><a href="#reviews">Reviews</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul></nav>
+  </div>
+</header>
+
+<!-- ============ HERO CAROUSEL ============ -->
+<section class="hero" id="top" aria-roledescription="carousel" aria-label="Featured cars">
+  <div class="slides"></div>
+  <div class="caption"><div class="wrap">
+    <span class="car-tag" id="carTag">Now in the workshop</span>
+    <h1 id="heroTitle">Honest repairs. Fast turnaround.</h1>
+    <p id="heroText">From a quick WOF to a full engine rebuild, our certified technicians keep Auckland moving.</p>
+    <div class="actions">
+      <a class="btn" href="#contact">Book a service</a>
+      <a class="btn ghost" href="#services">Our services</a>
+    </div>
+  </div></div>
+  <button class="arrow prev" aria-label="Previous slide">‹</button>
+  <button class="arrow next" aria-label="Next slide">›</button>
+  <button class="shuffle" title="Load a new random set of cars">🔀 Shuffle cars</button>
+  <div class="dots" role="tablist"></div>
+</section>
+
+<div class="strip">
+  <div class="wrap">
+    <div><b data-count="25">0</b><small>Years in business</small></div>
+    <div><b data-count="18400">0</b><small>Cars serviced</small></div>
+    <div><b data-count="12">0</b><small>Month warranty</small></div>
+    <div><b data-count="4.9" data-dec="1">0</b><small>Google rating</small></div>
+  </div>
+</div>
+
+<!-- ============ SERVICES ============ -->
+<section class="services" id="services">
+  <div class="wrap">
+    <div class="eyebrow">What we do</div>
+    <h2>Workshop services</h2>
+    <p class="lead">Every job starts with a free digital inspection, photos included, so you know exactly what you're paying for.</p>
+    <div class="grid" id="serviceGrid"></div>
+  </div>
+</section>
+
+<!-- ============ ABOUT ============ -->
+<section class="about" id="about">
+  <div class="wrap">
+    <div class="reveal">
+      <div class="eyebrow">Why choose us</div>
+      <h2>A family garage with dealer-level gear</h2>
+      <p class="lead">We've been fixing cars on Piston Lane since 2001. Same crew, same handshake, but now with factory diagnostic tools for every major make — Toyota to Tesla.</p>
+      <ul class="checks">
+        <li>Qualified, MTA-accredited technicians</li>
+        <li>Genuine or OEM-quality parts only</li>
+        <li>Free courtesy car &amp; local drop-off</li>
+        <li>Written quote before any work begins</li>
+      </ul>
+    </div>
+    <img class="reveal" id="aboutImg" alt="Mechanic working under a car" loading="lazy"
+         src="https://loremflickr.com/900/675/mechanic,garage?lock=7">
+  </div>
+</section>
+
+<!-- ============ PRICING ============ -->
+<section class="pricing" id="pricing">
+  <div class="wrap">
+    <div class="eyebrow">Service packages</div>
+    <h2>Simple, upfront pricing</h2>
+    <p class="lead">Prices for a standard 4-cylinder petrol car. Larger engines, European and diesel vehicles may vary — we'll always quote first.</p>
+    <div class="grid">
+      <div class="plan reveal">
+        <h3>Basic</h3>
+        <div class="price">$149 <small>/ visit</small></div>
+        <ul><li>Oil &amp; filter change</li><li>Fluid top-ups</li><li>Tyre pressure check</li><li>25-point safety check</li></ul>
+        <a class="btn" href="#contact" data-pick="Basic service">Choose Basic</a>
+      </div>
+      <div class="plan best reveal">
+        <h3>Full Service</h3>
+        <div class="price">$289 <small>/ visit</small></div>
+        <ul><li>Everything in Basic</li><li>Air &amp; cabin filters</li><li>Brake inspection &amp; clean</li><li>Battery health test</li><li>Tyre rotation</li></ul>
+        <a class="btn" href="#contact" data-pick="Full service">Choose Full</a>
+      </div>
+      <div class="plan reveal">
+        <h3>Premium</h3>
+        <div class="price">$449 <small>/ visit</small></div>
+        <ul><li>Everything in Full</li><li>Spark plugs</li><li>Coolant &amp; brake fluid flush</li><li>Wheel alignment</li><li>Interior valet</li></ul>
+        <a class="btn" href="#contact" data-pick="Premium service">Choose Premium</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PROCESS ============ -->
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="eyebrow">How it works</div>
+    <h2>Four steps, zero surprises</h2>
+    <div class="grid steps">
+      <div class="step reveal"><h3>Book</h3><p>Pick a time online or give us a call. Same-day slots most weekdays.</p></div>
+      <div class="step reveal"><h3>Inspect</h3><p>We run a digital inspection and text you photos of anything we find.</p></div>
+      <div class="step reveal"><h3>Approve</h3><p>You approve the quote line by line. No approval, no work.</p></div>
+      <div class="step reveal"><h3>Drive</h3><p>Pick up your car, washed, with a 12-month parts &amp; labour warranty.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ REVIEWS ============ -->
+<section class="reviews" id="reviews">
+  <div class="wrap">
+    <div class="eyebrow">Reviews</div>
+    <h2>What our customers say</h2>
+    <div class="grid">
+      <div class="quote reveal"><div class="stars">★★★★★</div><p>"Found the rattle two other garages missed, and charged less than their quote. Won a customer for life."</p><div class="who"><div class="avatar">SM</div><div><b>Sarah M.</b><br><small>2014 Mazda 3</small></div></div></div>
+      <div class="quote reveal"><div class="stars">★★★★★</div><p>"The photo report is brilliant. I could see the worn brake pads for myself before saying yes."</p><div class="who"><div class="avatar">RT</div><div><b>Rangi T.</b><br><small>Ford Ranger</small></div></div></div>
+      <div class="quote reveal"><div class="stars">★★★★☆</div><p>"Booked at 8, WOF done by 10 with a courtesy car in between. Easy as."</p><div class="who"><div class="avatar">JL</div><div><b>James L.</b><br><small>Toyota Prius</small></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="faq">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">FAQ</div>
+      <h2>Common questions</h2>
+      <p class="lead">Can't find your answer? Flick us a message below and a real person will reply within the hour during opening times.</p>
+    </div>
+    <div>
+      <details open><summary>How long does a WOF take?</summary><p>Around 30–45 minutes. You're welcome to wait in our lounge — the coffee's free and the Wi-Fi is fast.</p></details>
+      <details><summary>Will servicing here void my new-car warranty?</summary><p>No. We follow manufacturer schedules and use approved parts, so your warranty stays fully intact.</p></details>
+      <details><summary>Do you work on hybrids and EVs?</summary><p>Yes — two of our techs are certified for high-voltage systems, including battery health reports.</p></details>
+      <details><summary>What payment options do you take?</summary><p>EFTPOS, credit card, bank transfer, Afterpay and Laybuy on jobs over $200.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONTACT ============ -->
+<section class="contact" id="contact">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Get in touch</div>
+      <h2>Book or ask a question</h2>
+      <p class="lead">Fill in the form and we'll confirm your booking by text. For breakdowns, call us directly.</p>
+      <div class="info">
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><span>42 Piston Lane, Penrose, Auckland 1061</span></div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg><a href="tel:0800867835">0800 867 835</a></div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg><a href="mailto:hello@example.com">hello@example.com</a></div>
+      </div>
+      <table class="hours" id="hours"></table>
+      <div class="map"><iframe title="Map" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=174.80%2C-36.92%2C174.83%2C-36.90&amp;layer=mapnik"></iframe></div>
+    </div>
+
+    <form id="contactForm" novalidate>
+      <div><label for="name">Full name</label><input id="name" name="name" autocomplete="name" required><span class="err"></span></div>
+      <div><label for="phone">Phone</label><input id="phone" name="phone" type="tel" autocomplete="tel" required pattern="[0-9 +()-]{7,}"><span class="err"></span></div>
+      <div class="full"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required><span class="err"></span></div>
+      <div><label for="rego">Rego plate</label><input id="rego" name="rego" placeholder="ABC123" maxlength="7" style="text-transform:uppercase"><span class="err"></span></div>
+      <div><label for="date">Preferred date</label><input id="date" name="date" type="date"><span class="err"></span></div>
+      <div class="full"><label for="service">Service</label>
+        <select id="service" name="service" required>
+          <option value="">Select a service…</option>
+        </select><span class="err"></span></div>
+      <div class="full"><label>Extras</label>
+        <div class="chips">
+          <label><input type="checkbox" name="extras" value="Courtesy car"> Courtesy car</label>
+          <label><input type="checkbox" name="extras" value="Wash & vac"> Wash &amp; vac</label>
+          <label><input type="checkbox" name="extras" value="Pick-up/drop-off"> Pick-up / drop-off</label>
+        </div></div>
+      <div class="full"><label for="msg">Message</label><textarea id="msg" name="msg" required placeholder="Tell us what's going on with your car…"></textarea><span class="err"></span></div>
+      <div class="full"><button class="btn" type="submit" style="width:100%">Send request</button></div>
+      <div class="sent" id="sent"><div class="big">✅</div><h3>Thanks, <span id="sentName"></span>!</h3><p>We've got your request and will text you shortly to confirm. <a href="#" id="again">Send another</a></p></div>
+    </form>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>© <span id="yr"></span> Torque &amp; Tread Automotive</span>
+    <span class="note">Example website — business, reviews and details are fictional. Car photos via LoremFlickr (Creative Commons).</span>
+  </div>
+</footer>
+
+<script>
+// ---------- services data (drives cards + form dropdown) ----------
+const ICON = {
+  wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  check:'<path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  disc:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>',
+  tyre:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M12 2v6M12 16v6M2 12h6M16 12h6"/>',
+  chip:'<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/>',
+  snow:'<path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9 4.9 19.1"/>',
+};
+const SERVICES = [
+  {n:'General servicing', i:'wrench', d:'Logbook and manufacturer-schedule services for every make and model.', p:'$149'},
+  {n:'WOF inspections', i:'check', d:'Quick, thorough Warrant of Fitness checks with free re-check within 28 days.', p:'$65'},
+  {n:'Brakes & suspension', i:'disc', d:'Pads, rotors, shocks and bushes — tested on our roller brake machine.', p:'$220'},
+  {n:'Tyres & alignment', i:'tyre', d:'All major brands, balancing, puncture repairs and laser wheel alignment.', p:'$89'},
+  {n:'Diagnostics', i:'chip', d:'Check-engine light on? Factory-level scan tools pinpoint the fault fast.', p:'$95'},
+  {n:'Air conditioning', i:'snow', d:'Re-gas, leak testing and full climate system repairs, hybrids included.', p:'$129'},
+];
+const svg = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
+document.getElementById('serviceGrid').innerHTML = SERVICES.map(s =>
+  `<div class="card reveal"><div class="ico">${svg(s.i)}</div><h3>${s.n}</h3><p>${s.d}</p><div class="from">From ${s.p}</div></div>`).join('');
+const sel = document.getElementById('service');
+[...SERVICES.map(s => s.n), 'Basic service', 'Full service', 'Premium service', 'Something else'].forEach(n => sel.add(new Option(n, n)));
+
+// ---------- carousel of random car images ----------
+const CARS = [
+  {tag:'Sports cars', title:'Honest repairs. Fast turnaround.', text:'From a quick WOF to a full engine rebuild, our certified technicians keep Auckland moving.'},
+  {tag:'Utes & 4WDs', title:'Built for work. Serviced right.', text:'Diesel specialists for Rangers, Hiluxes and Navaras — fleet discounts available.'},
+  {tag:'Classics', title:'Old-school care for classic metal.', text:'Carburettor tuning, restorations and pre-purchase inspections for vintage cars.'},
+  {tag:'Hybrids & EVs', title:'Ready for what\'s next.', text:'High-voltage certified techs for hybrid and electric vehicle servicing.'},
+  {tag:'Everyday cars', title:'WOF while you wait.', text:'Grab a free coffee in our lounge — most WOFs done in under 45 minutes.'},
+];
+const KEYWORDS = ['sportscar','car,truck','classic,car','car,electric','car'];
+const slidesEl = document.querySelector('.slides'), dotsEl = document.querySelector('.dots');
+let idx = 0, timer, seed = Math.floor(Math.random() * 10000);
+
+function buildSlides(){
+  slidesEl.innerHTML = ''; dotsEl.innerHTML = '';
+  CARS.forEach((c, i) => {
+    const s = document.createElement('div');
+    s.className = 'slide';
+    s.setAttribute('aria-label', `${i + 1} of ${CARS.length}`);
+    const img = new Image();
+    img.alt = c.tag;
+    img.loading = i ? 'lazy' : 'eager';
+    img.src = `https://loremflickr.com/1600/900/${KEYWORDS[i]}?lock=${seed + i}`;
+    img.onerror = () => { s.classList.add('noimg'); img.remove(); };
+    s.appendChild(img);
+    slidesEl.appendChild(s);
+    const d = document.createElement('button');
+    d.setAttribute('aria-label', `Go to slide ${i + 1}`);
+    d.onclick = () => go(i, true);
+    dotsEl.appendChild(d);
+  });
+  go(0);
+}
+function go(i, user){
+  idx = (i + CARS.length) % CARS.length;
+  slidesEl.style.transform = `translateX(-${idx * 100}%)`;
+  [...dotsEl.children].forEach((d, j) => d.classList.toggle('on', j === idx));
+  const c = CARS[idx];
+  document.getElementById('carTag').textContent = c.tag;
+  document.getElementById('heroTitle').textContent = c.title;
+  document.getElementById('heroText').textContent = c.text;
+  if (user) restart();
+}
+function restart(){ clearInterval(timer); timer = setInterval(() => go(idx + 1), 5500); }
+document.querySelector('.prev').onclick = () => go(idx - 1, true);
+document.querySelector('.next').onclick = () => go(idx + 1, true);
+document.querySelector('.shuffle').onclick = () => { seed = Math.floor(Math.random() * 10000); buildSlides(); restart(); };
+const hero = document.querySelector('.hero');
+hero.addEventListener('mouseenter', () => clearInterval(timer));
+hero.addEventListener('mouseleave', restart);
+let tx = null;
+hero.addEventListener('touchstart', e => tx = e.touches[0].clientX, {passive:true});
+hero.addEventListener('touchend', e => {
+  if (tx === null) return;
+  const dx = e.changedTouches[0].clientX - tx;
+  if (Math.abs(dx) > 40) go(idx + (dx < 0 ? 1 : -1), true);
+  tx = null;
+});
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,select')) return;
+  if (e.key === 'ArrowLeft') go(idx - 1, true);
+  if (e.key === 'ArrowRight') go(idx + 1, true);
+});
+buildSlides(); restart();
+
+// ---------- mobile menu ----------
+const menuBtn = document.querySelector('.menu-btn'), navList = document.querySelector('nav ul');
+menuBtn.onclick = () => menuBtn.setAttribute('aria-expanded', navList.classList.toggle('open'));
+navList.addEventListener('click', e => { if (e.target.tagName === 'A') navList.classList.remove('open'); });
+
+// ---------- animated counters + scroll reveal ----------
+const io = new IntersectionObserver(entries => entries.forEach(en => {
+  if (!en.isIntersecting) return;
+  const el = en.target; io.unobserve(el);
+  if (el.dataset.count) {
+    const end = +el.dataset.count, dec = +(el.dataset.dec || 0), t0 = performance.now();
+    const tick = now => {
+      const k = Math.min(1, (now - t0) / 1400), v = end * (1 - Math.pow(1 - k, 3));
+      el.textContent = dec ? v.toFixed(dec) : Math.round(v).toLocaleString() + (k === 1 && end > 1000 ? '+' : '');
+      if (k < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  } else el.classList.add('in');
+}), {threshold:.15});
+document.querySelectorAll('[data-count],.reveal').forEach(el => io.observe(el));
+
+// ---------- opening hours with today highlighted ----------
+const HOURS = [['Monday','7:30am – 5:30pm'],['Tuesday','7:30am – 5:30pm'],['Wednesday','7:30am – 5:30pm'],['Thursday','7:30am – 5:30pm'],['Friday','7:30am – 5:30pm'],['Saturday','8:00am – 12:00pm'],['Sunday','Closed']];
+const today = (new Date().getDay() + 6) % 7;
+document.getElementById('hours').innerHTML = HOURS.map(([d, h], i) =>
+  `<tr class="${i === today ? 'today' : ''}"><td>${d}${i === today ? ' (today)' : ''}</td><td>${h}</td></tr>`).join('');
+
+// ---------- pricing buttons pre-fill the form ----------
+document.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => { sel.value = b.dataset.pick; }));
+
+// ---------- contact form validation (demo: no server, nothing is sent) ----------
+const form = document.getElementById('contactForm');
+const dateIn = document.getElementById('date');
+dateIn.min = new Date().toISOString().slice(0, 10);
+const MSG = {
+  name: v => v.trim().length < 2 && 'Please enter your name.',
+  phone: v => !/^[0-9 +()-]{7,}$/.test(v.trim()) && 'Enter a valid phone number.',
+  email: v => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) && 'Enter a valid email address.',
+  rego: v => v && !/^[A-Za-z0-9]{1,7}$/.test(v) && 'Plates are up to 7 letters/numbers.',
+  date: v => v && new Date(v + 'T00:00').getDay() === 0 && "We're closed Sundays — pick another day.",
+  service: v => !v && 'Choose a service.',
+  msg: v => v.trim().length < 10 && 'Give us a little more detail (10+ characters).',
+};
+function check(el){
+  const fn = MSG[el.name]; if (!fn) return true;
+  const err = fn(el.value) || '';
+  el.classList.toggle('invalid', !!err);
+  el.parentElement.querySelector('.err').textContent = err;
+  return !err;
+}
+form.addEventListener('input', e => { if (e.target.classList.contains('invalid')) check(e.target); });
+form.addEventListener('focusout', e => { if (e.target.value) check(e.target); });
+form.addEventListener('submit', e => {
+  e.preventDefault();
+  const fields = [...form.elements].filter(el => MSG[el.name]);
+  const ok = fields.map(check).every(Boolean);
+  if (!ok) { fields.find(f => f.classList.contains('invalid'))?.focus(); return; }
+  const data = Object.fromEntries(new FormData(form));
+  data.extras = new FormData(form).getAll('extras');
+  console.log('Booking request (demo only):', data);
+  document.getElementById('sentName').textContent = data.name.split(' ')[0];
+  [...form.children].forEach(c => c.hidden = c.id !== 'sent');
+  document.getElementById('sent').classList.add('show');
+});
+document.getElementById('again').onclick = e => {
+  e.preventDefault(); form.reset();
+  [...form.children].forEach(c => c.hidden = false);
+  document.getElementById('sent').classList.remove('show');
+};
+
+document.getElementById('yr').textContent = new Date().getFullYear();
+</script>
+</body>
+</html>
