@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Torque &amp; Tread Automotive</title>
-<meta name="description" content="Example mechanic website — servicing, WOFs, brakes, tyres and diagnostics.">
+<meta name="description" content="Example mechanic website — servicing, pink slips, brakes, tyres and diagnostics.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -47,7 +47,7 @@ nav a:hover,nav a.active{color:var(--ink)}
 .hero h1{font-size:clamp(1.7rem,4.2vw,3rem);margin:0}
 .town-wrap::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.6))}
 .town-wrap{position:relative;background:#1b1d20;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
-#town{display:block;width:100%;height:auto;max-height:calc(100svh - 250px);min-height:340px;margin:0 auto;user-select:none;-webkit-tap-highlight-color:transparent}
+#town{display:block;width:100%;height:auto;max-height:calc(100svh - 300px);min-height:340px;margin:0 auto;user-select:none;-webkit-tap-highlight-color:transparent}
 .bld{cursor:pointer;outline:none}
 .bld .roof{transition:filter .2s}
 .bld:hover .roof,.bld:focus-visible .roof{filter:brightness(1.3)}
@@ -65,6 +65,9 @@ nav a:hover,nav a.active{color:var(--ink)}
 .car .tail{fill:#5a0d0d}
 .car.braking .tail{fill:#ff2b2b;filter:drop-shadow(0 0 3px #ff2b2b)}
 .person{pointer-events:none}
+.snd{position:absolute;top:10px;right:10px;z-index:2;width:36px;height:36px;border-radius:4px;border:1px solid var(--line);background:rgba(11,12,14,.8);color:var(--muted);cursor:pointer;display:grid;place-items:center}
+.snd:hover,.snd:focus-visible{color:var(--ink);border-color:var(--brand);outline:none}
+.snd svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* ---------- bay panel: always exactly covers the yard ---------- */
 .room{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;background:rgba(14,15,17,.97);backdrop-filter:blur(6px)}
@@ -80,12 +83,13 @@ nav a:hover,nav a.active{color:var(--ink)}
 .room-body section{padding:36px 0 40px}
 .room .reveal{opacity:1;transform:none}
 
-/* ---------- trust strip ---------- */
-.strip{padding:28px 0 8px}
-.strip .wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;padding:0}
-.strip .wrap>div{background:var(--surface);padding:20px 12px;text-align:center}
-.strip b{display:block;font-family:Oswald,sans-serif;font-size:2rem;line-height:1;color:var(--brand);font-weight:600}
-.strip small{color:var(--muted);text-transform:uppercase;letter-spacing:.14em;font-size:.68rem}
+/* ---------- stats: a status bar hung off the bottom of the yard ---------- */
+.town-wrap{border-radius:var(--radius) var(--radius) 0 0;box-shadow:none}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-top:0;border-radius:0 0 var(--radius) var(--radius);background:var(--dark);box-shadow:var(--shadow)}
+.stats>div{display:flex;align-items:baseline;justify-content:center;gap:10px;padding:12px 10px}
+.stats>div+div{border-left:1px solid var(--line)}
+.stats b{font-family:Oswald,sans-serif;font-size:1.25rem;line-height:1;color:var(--brand);font-weight:600}
+.stats small{color:var(--muted);text-transform:uppercase;letter-spacing:.14em;font-size:.64rem}
 
 /* ---------- services ---------- */
 .grid{display:grid;gap:18px}
@@ -187,7 +191,10 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   nav ul.open{display:flex}
   nav li a{display:block;padding:12px 0;border-bottom:1px solid var(--line)}
   .services .grid,.pricing .grid,.reviews .grid,.steps{grid-template-columns:1fr}
-  .strip .wrap{grid-template-columns:1fr 1fr;margin:0 16px}
+  .stats{grid-template-columns:1fr 1fr}
+  .stats>div:nth-child(3){border-left:0}
+  .stats>div:nth-child(n+3){border-top:1px solid var(--line)}
+  .stats>div{flex-direction:column;align-items:center;gap:4px}
   form{grid-template-columns:1fr;padding:20px}
   .topbar .hide-sm{display:none}
 }
@@ -200,9 +207,9 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 
 <div class="topbar">
   <div class="wrap">
-    <span>📍 42 Piston Lane, Auckland</span>
+    <span>📍 42 Piston Lane, Alexandria NSW</span>
     <span class="hide-sm">Mon–Fri 7:30–5:30 · Sat 8–12</span>
-    <a href="tel:0800867835">📞 0800 TORQUE</a>
+    <a href="tel:+61255504821">📞 (02) 5550 4821</a>
   </div>
 </div>
 
@@ -228,29 +235,27 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   <div class="wrap">
     <div class="hero-head">
       <div>
-        <div class="eyebrow">Torque &amp; Tread · Penrose, Auckland</div>
+        <div class="eyebrow">Torque &amp; Tread · Alexandria, Sydney</div>
         <h1>Honest repairs. Fast turnaround.</h1>
       </div>
       <a class="btn" href="#contact">Book a service</a>
     </div>
     <div class="town-wrap">
+      <button class="snd" type="button" aria-label="Mute sound"></button>
       <svg id="town" role="group" aria-label="Workshop yard. Choose a bay to visit."></svg>
       <div id="room" class="room" role="region" aria-live="polite" hidden>
         <div class="room-bar"><span class="room-bay"></span><span class="room-title"></span><button class="room-x" aria-label="Close">✕</button></div>
         <div class="room-body"></div>
       </div>
     </div>
+    <div class="stats">
+      <div><b data-count="25">0</b><small>Years in business</small></div>
+      <div><b data-count="18400">0</b><small>Cars serviced</small></div>
+      <div><b data-count="12">0</b><small>Month warranty</small></div>
+      <div><b data-count="4.9" data-dec="1">0</b><small>Google rating</small></div>
+    </div>
   </div>
 </section>
-
-<div class="strip">
-  <div class="wrap">
-    <div><b data-count="25">0</b><small>Years in business</small></div>
-    <div><b data-count="18400">0</b><small>Cars serviced</small></div>
-    <div><b data-count="12">0</b><small>Month warranty</small></div>
-    <div><b data-count="4.9" data-dec="1">0</b><small>Google rating</small></div>
-  </div>
-</div>
 
 <div id="rooms" hidden>
 
@@ -272,7 +277,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <h2>A family garage with dealer-level gear</h2>
       <p class="lead">We've been fixing cars on Piston Lane since 2001. Same crew, same handshake, but now with factory diagnostic tools for every major make — Toyota to Tesla.</p>
       <ul class="checks">
-        <li>Qualified, MTA-accredited technicians</li>
+        <li>Licensed, qualified technicians</li>
         <li>Genuine or OEM-quality parts only</li>
         <li>Free courtesy car &amp; local drop-off</li>
         <li>Written quote before any work begins</li>
@@ -333,8 +338,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     <h2>What our customers say</h2>
     <div class="grid">
       <div class="quote reveal"><div class="stars">★★★★★</div><p>"Found the rattle two other garages missed, and charged less than their quote. Won a customer for life."</p><div class="who"><div class="avatar">SM</div><div><b>Sarah M.</b><br><small>2014 Mazda 3</small></div></div></div>
-      <div class="quote reveal"><div class="stars">★★★★★</div><p>"The photo report is brilliant. I could see the worn brake pads for myself before saying yes."</p><div class="who"><div class="avatar">RT</div><div><b>Rangi T.</b><br><small>Ford Ranger</small></div></div></div>
-      <div class="quote reveal"><div class="stars">★★★★☆</div><p>"Booked at 8, WOF done by 10 with a courtesy car in between. Easy as."</p><div class="who"><div class="avatar">JL</div><div><b>James L.</b><br><small>Toyota Prius</small></div></div></div>
+      <div class="quote reveal"><div class="stars">★★★★★</div><p>"The photo report is brilliant. I could see the worn brake pads for myself before saying yes."</p><div class="who"><div class="avatar">LO</div><div><b>Liam O.</b><br><small>Ford Ranger</small></div></div></div>
+      <div class="quote reveal"><div class="stars">★★★★☆</div><p>"Booked at 8, pink slip done by 10 with a courtesy car in between. Too easy."</p><div class="who"><div class="avatar">JL</div><div><b>James L.</b><br><small>Toyota Prius</small></div></div></div>
     </div>
   </div>
 </section>
@@ -348,10 +353,10 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <p class="lead">Can't find your answer? Flick us a message below and a real person will reply within the hour during opening times.</p>
     </div>
     <div>
-      <details open><summary>How long does a WOF take?</summary><p>Around 30–45 minutes. You're welcome to wait in our lounge — the coffee's free and the Wi-Fi is fast.</p></details>
+      <details open><summary>How long does a pink slip take?</summary><p>Around 30–45 minutes. You're welcome to wait in our lounge — the coffee's free and the Wi-Fi is fast.</p></details>
       <details><summary>Will servicing here void my new-car warranty?</summary><p>No. We follow manufacturer schedules and use approved parts, so your warranty stays fully intact.</p></details>
       <details><summary>Do you work on hybrids and EVs?</summary><p>Yes — two of our techs are certified for high-voltage systems, including battery health reports.</p></details>
-      <details><summary>What payment options do you take?</summary><p>EFTPOS, credit card, bank transfer, Afterpay and Laybuy on jobs over $200.</p></details>
+      <details><summary>What payment options do you take?</summary><p>EFTPOS, credit card, bank transfer, and Afterpay or Zip on jobs over $200.</p></details>
     </div>
   </div>
 </section>
@@ -364,19 +369,19 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <h2>Book or ask a question</h2>
       <p class="lead">Fill in the form and we'll confirm your booking by text. For breakdowns, call us directly.</p>
       <div class="info">
-        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><span>42 Piston Lane, Penrose, Auckland 1061</span></div>
-        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg><a href="tel:0800867835">0800 867 835</a></div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><span>42 Piston Lane, Alexandria NSW 2015</span></div>
+        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg><a href="tel:+61255504821">(02) 5550 4821</a></div>
         <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg><a href="mailto:hello@example.com">hello@example.com</a></div>
       </div>
       <table class="hours" id="hours"></table>
-      <div class="map"><iframe title="Map" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=174.80%2C-36.92%2C174.83%2C-36.90&amp;layer=mapnik"></iframe></div>
+      <div class="map"><iframe title="Map" loading="lazy" src="https://www.openstreetmap.org/export/embed.html?bbox=151.182%2C-33.918%2C151.206%2C-33.900&amp;layer=mapnik"></iframe></div>
     </div>
 
     <form id="contactForm" novalidate>
       <div><label for="name">Full name</label><input id="name" name="name" autocomplete="name" required><span class="err"></span></div>
       <div><label for="phone">Phone</label><input id="phone" name="phone" type="tel" autocomplete="tel" required pattern="[0-9 +()-]{7,}"><span class="err"></span></div>
       <div class="full"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required><span class="err"></span></div>
-      <div><label for="rego">Rego plate</label><input id="rego" name="rego" placeholder="ABC123" maxlength="7" style="text-transform:uppercase"><span class="err"></span></div>
+      <div><label for="rego">Rego plate</label><input id="rego" name="rego" placeholder="ABC12D" maxlength="7" style="text-transform:uppercase"><span class="err"></span></div>
       <div><label for="date">Preferred date</label><input id="date" name="date" type="date"><span class="err"></span></div>
       <div class="full"><label for="service">Service</label>
         <select id="service" name="service" required>
@@ -416,7 +421,7 @@ const ICON = {
 };
 const SERVICES = [
   {n:'General servicing', i:'wrench', d:'Logbook and manufacturer-schedule services for every make and model.', p:'$149'},
-  {n:'WOF inspections', i:'check', d:'Quick, thorough Warrant of Fitness checks with free re-check within 28 days.', p:'$65'},
+  {n:'Pink slips', i:'check', d:'NSW e-Safety Checks for your rego renewal, with a free re-inspection within 14 days.', p:'$45'},
   {n:'Brakes & suspension', i:'disc', d:'Pads, rotors, shocks and bushes — tested on our roller brake machine.', p:'$220'},
   {n:'Tyres & alignment', i:'tyre', d:'All major brands, balancing, puncture repairs and laser wheel alignment.', p:'$89'},
   {n:'Diagnostics', i:'chip', d:'Check-engine light on? Factory-level scan tools pinpoint the fault fast.', p:'$95'},
@@ -451,7 +456,7 @@ const sel = document.getElementById('service');
       track:'M200 120 H400 A100 100 0 0 1 500 220 V780 A100 100 0 0 1 400 880 H200 A100 100 0 0 1 100 780 V220 A100 100 0 0 1 200 120 Z',
       at:{services:[300,50], about:[385,300], pricing:[215,300], process:[385,500], reviews:[215,500], faq:[215,700], contact:[300,950]}},
   };
-  const LANE = 15, A = 950, VMAX = 820, WALK = 95;
+  const LANE = 18, A = 950, VMAX = 820, WALK = 95;
   const el = (tag, attrs = {}, parent) => {
     const e = document.createElementNS(NS, tag);
     for (const k in attrs) e.setAttribute(k, attrs[k]);
@@ -471,7 +476,7 @@ const sel = document.getElementById('service');
   })();
 
   let layoutKey, L, path, len, stops = {}, bld = {};
-  let me, rival, person, state = 'idle', target = null, here = null, pending = null, walk = null;
+  let me, person, state = 'idle', target = null, here = null, pending = null, walk = null;
 
   // position on the centre line + sideways offset
   function pose(s, lane){
@@ -544,36 +549,27 @@ const sel = document.getElementById('service');
       el('path', {d, stroke:'rgba(0,0,0,.55)', 'stroke-width':1.2, fill:'none'}, svg);
     }
 
-    // track: concrete shoulder, asphalt, worn edge lines, hazard kerbs, slots
-    el('path', {d:L.track, fill:'none', stroke:'#2c2f33', 'stroke-width':94}, svg);
-    path = el('path', {d:L.track, fill:'none', stroke:'#1f2124', 'stroke-width':78}, svg);
+    // road: footpath, kerb, asphalt, edge lines, dashed centre line
+    el('path', {d:L.track, fill:'none', stroke:'#2a2d31', 'stroke-width':104}, svg);
+    el('path', {d:L.track, fill:'none', stroke:'#44474c', 'stroke-width':86}, svg);
+    path = el('path', {d:L.track, fill:'none', stroke:'#1d1f22', 'stroke-width':80}, svg);
     len = path.getTotalLength();
-    [-35, 35].forEach(o => el('path', {d:offsetLine(0, len, o) + ' Z', fill:'none', stroke:'rgba(215,210,195,.38)', 'stroke-width':2}, svg));
-    // yellow/black kerbs on the outside of every bend
-    let run = null;
-    for (let s = 0; s <= len + 8; s += 8){
-      const t = s <= len ? turn(s, 20) : 0, side = Math.sign(t);
-      if (Math.abs(t) > .09 && (!run || run.side === side)){ run = run || {from:s, side}; run.to = s; continue; }
-      if (run && run.to - run.from > 30){
-        const d = offsetLine(run.from, run.to, -run.side * 42, 3);
-        el('path', {d, fill:'none', stroke:'#b8931f', 'stroke-width':7}, svg);
-        el('path', {d, fill:'none', stroke:'#141414', 'stroke-width':7, 'stroke-dasharray':'9 9'}, svg);
-      }
-      run = null;
+    [-35, 35].forEach(o => el('path', {d:offsetLine(0, len, o) + ' Z', fill:'none', stroke:'rgba(220,215,200,.42)', 'stroke-width':2.2}, svg));
+    el('path', {d:L.track, fill:'none', stroke:'rgba(225,220,205,.62)', 'stroke-width':2.4, 'stroke-dasharray':'20 16'}, svg);
+    // patched asphalt, manholes, rubber through the bends
+    for (let i = 0; i < 12; i++){
+      const q = pose(rnd() * len, (rnd() - .5) * 44);
+      el('rect', {x:-16, y:-10, width:24 + rnd() * 26, height:14 + rnd() * 10, fill:'rgba(0,0,0,.22)', transform:`translate(${q.x.toFixed(0)} ${q.y.toFixed(0)}) rotate(${(q.a * 180 / Math.PI).toFixed(0)})`}, svg);
     }
-    [-LANE, LANE].forEach(lane => {
-      const d = offsetLine(0, len, lane) + ' Z';
-      el('path', {d, fill:'none', stroke:'#62676e', 'stroke-width':6}, svg);
-      el('path', {d, fill:'none', stroke:'#070808', 'stroke-width':2}, svg);
-    });
-    // rubber laid down through the corners
+    for (let i = 0; i < 3; i++){
+      const q = pose(len * (i + .3) / 3, (rnd() < .5 ? -1 : 1) * 20);
+      el('circle', {cx:q.x, cy:q.y, r:7, fill:'#26282c', stroke:'#3b3e43', 'stroke-width':1.5}, svg);
+    }
     for (let s = 0; s < len; s += 30){
-      if (Math.abs(turn(s, 40)) < .3 || rnd() < .4) continue;
+      if (Math.abs(turn(s, 40)) < .3 || rnd() < .5) continue;
       const lane = rnd() < .5 ? -LANE : LANE, l = 40 + rnd() * 60;
-      [-6, 6].forEach(o => el('path', {d:offsetLine(s, s + l, lane + o, 5), fill:'none', stroke:'rgba(0,0,0,.4)', 'stroke-width':3, 'stroke-linecap':'round'}, svg));
+      [-6, 6].forEach(o => el('path', {d:offsetLine(s, s + l, lane + o, 5), fill:'none', stroke:'rgba(0,0,0,.35)', 'stroke-width':3, 'stroke-linecap':'round'}, svg));
     }
-    const st = pose(0, 0);
-    el('rect', {x:st.x - 5, y:st.y - 38, width:10, height:76, fill:'url(#chk)', opacity:.75}, svg);
 
     // bays, each with a stop on the track nearest its roller door
     stops = {}; bld = {};
@@ -611,7 +607,7 @@ const sel = document.getElementById('service');
     // yard clutter in the spare space: containers, tyre stacks, pallets, oil
     const samples = [];
     for (let s = 0; s < len; s += 12) samples.push(path.getPointAtLength(s));
-    const free = (x, y, r) => !samples.some(p => (p.x - x) ** 2 + (p.y - y) ** 2 < (56 + r) ** 2)
+    const free = (x, y, r) => !samples.some(p => (p.x - x) ** 2 + (p.y - y) ** 2 < (62 + r) ** 2)
       && !boxes.some(b => x > b[0] - r && x < b[2] + r && y > b[1] - r && y < b[3] + r);
     const RUST = ['#5a3527', '#2e4350', '#3f4433', '#4b4f55'];
     for (let i = 0, n = 0; i < 500 && n < 22; i++){
@@ -646,8 +642,7 @@ const sel = document.getElementById('service');
       el('circle', {cx:x, cy:y, r:4, fill:'#6b6e73', stroke:'#111'}, svg);
     });
 
-    rival = {g: makeCar('rival', '#8d959e', '#2f343a', svg), s: len * .45, v: 300, lane: LANE};
-    me = me ? {...me, g: makeCar('me', '#d4561f', '#5e1f0d', svg)} : {g: makeCar('me', '#d4561f', '#5e1f0d', svg), s: 0, v: 0, lane: -LANE};
+    me = me ? {...me, g: makeCar('me', '#d4561f', '#5e1f0d', svg)} : {g: makeCar('me', '#d4561f', '#5e1f0d', svg), s: 0, v: 0, dir: 1, lane: -LANE, ang: null};
     if (here) me.s = stops[here];
     person = el('g', {class:'person', opacity:0}, svg);
     el('ellipse', {cx:0, cy:0, rx:4.5, ry:7.5, fill:'#23262b'}, person);
@@ -668,20 +663,28 @@ const sel = document.getElementById('service');
     if (state === 'walkBack'){ pending = id; return; }
     Object.values(bld).forEach(b => b.g.classList.remove('target'));
     if (here === id && state === 'idle'){ arrive(id); return; }
+    sfx.init();
+    if (me.v < 1){
+      const fwd = ((stops[id] - me.s) % len + len) % len;
+      me.dir = fwd <= len - fwd ? 1 : -1;     // it's a two-way road: take the short way
+    }
+    if (state !== 'driving') sfx.start();
     target = id; here = null; state = 'driving';
     bld[id].g.classList.add('target');
   }
   function arrive(id){
     here = id; target = null; state = 'walkOut';
     bld[id].g.classList.remove('target');
+    sfx.door();
     const c = pose(me.s, me.lane);
-    walk = {from:{x:c.x, y:c.y}, to:bld[id].door, t:0};
+    walk = {from:{x:c.x, y:c.y}, to:bld[id].door, t:0, steps:0};
     walk.dur = Math.hypot(walk.to.x - walk.from.x, walk.to.y - walk.from.y) / WALK;
   }
   function openRoom(id){
     state = 'inside';
     const pl = PLACES.find(p => p.id === id);
     bld[id].doorEl.classList.add('open');
+    sfx.roller();
     room.querySelector('.room-bay').textContent = pl.bay;
     room.querySelector('.room-title').textContent = pl.name;
     roomBody.replaceChildren(document.getElementById(id));
@@ -700,10 +703,11 @@ const sel = document.getElementById('service');
     history.replaceState(null, '', location.pathname + location.search);
     if (!here){ state = 'idle'; return; }
     bld[here].doorEl.classList.remove('open');
+    sfx.roller();
     bld[here].g.focus({preventScroll:true});
     const c = pose(me.s, me.lane);
     state = 'walkBack';
-    walk = {from:bld[here].door, to:{x:c.x, y:c.y}, t:0};
+    walk = {from:bld[here].door, to:{x:c.x, y:c.y}, t:0, steps:0};
     walk.dur = Math.hypot(walk.to.x - walk.from.x, walk.to.y - walk.from.y) / WALK;
   }
   room.querySelector('.room-x').onclick = closeRoom;
@@ -719,35 +723,113 @@ const sel = document.getElementById('service');
     if (isOpen()){ pending = id; closeRoom(); } else go(id);
   });
 
+  // ----- sound: all synthesised with Web Audio, nothing to download -----
+  const sfx = (() => {
+    let ctx, out, eng, sub, filt, engGain, noiseBuf, on = true;
+    try { on = localStorage.getItem('tt_sound') !== 'off'; } catch {}
+    function init(){
+      if (ctx){ if (ctx.state === 'suspended') ctx.resume(); return; }
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      ctx = new AC();
+      out = ctx.createGain(); out.gain.value = on ? .7 : 0; out.connect(ctx.destination);
+      noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      // engine: sawtooth + a sub-octave square through a resonant lowpass; pitch follows the revs
+      eng = ctx.createOscillator(); eng.type = 'sawtooth'; eng.frequency.value = 40;
+      sub = ctx.createOscillator(); sub.type = 'square'; sub.frequency.value = 20;
+      const subG = ctx.createGain(); subG.gain.value = .5;
+      filt = ctx.createBiquadFilter(); filt.type = 'lowpass'; filt.frequency.value = 300; filt.Q.value = 4;
+      engGain = ctx.createGain(); engGain.gain.value = 0;
+      eng.connect(filt); sub.connect(subG).connect(filt); filt.connect(engGain).connect(out);
+      eng.start(); sub.start();
+    }
+    function noise(dur, type, freq, q, vol, attack = .005, when = 0){
+      if (!ctx) return;
+      const t = ctx.currentTime + when, src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      src.buffer = noiseBuf; f.type = type; f.frequency.value = freq; f.Q.value = q;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+      src.connect(f).connect(g).connect(out); src.start(t, Math.random() * .5); src.stop(t + dur + .05);
+    }
+    function thump(freq, dur, vol, when = 0){
+      if (!ctx) return;
+      const t = ctx.currentTime + when, o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(freq * .5, t + dur);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+      o.connect(g).connect(out); o.start(t); o.stop(t + dur + .05);
+    }
+    const GEARS = [0, 200, 420, 640, VMAX];
+    return {
+      init,
+      get on(){ return on; },
+      toggle(){
+        on = !on;
+        try { localStorage.setItem('tt_sound', on ? 'on' : 'off'); } catch {}
+        init();
+        if (ctx) out.gain.setTargetAtTime(on ? .7 : 0, ctx.currentTime, .05);
+      },
+      engine(running, speed){
+        if (!ctx) return;
+        let g = 0;
+        while (g < GEARS.length - 2 && speed > GEARS[g + 1]) g++;
+        // revs climb through each gear then drop on the change
+        const rpm = !running ? 0 : speed < 5 ? .12 : .3 + .7 * clamp((speed - GEARS[g]) / (GEARS[g + 1] - GEARS[g]), 0, 1);
+        const t = ctx.currentTime, f = 38 + rpm * 110;
+        eng.frequency.setTargetAtTime(f, t, .05);
+        sub.frequency.setTargetAtTime(f / 2, t, .05);
+        filt.frequency.setTargetAtTime(250 + rpm * 1400, t, .08);
+        engGain.gain.setTargetAtTime(running ? .09 + rpm * .08 : 0, t, running ? .08 : .25);
+      },
+      start(){ noise(.35, 'lowpass', 300, 1, .25, .02); thump(55, .3, .3); },
+      door(){ noise(.12, 'lowpass', 500, 1, .5); thump(90, .15, .5); },
+      step(){ noise(.05, 'bandpass', 1000 + Math.random() * 400, 2, .14, .003); },
+      screech(){ noise(.45, 'bandpass', 2400, 6, .07, .03); },
+      roller(){ for (let i = 0; i < 14; i++) noise(.04, 'bandpass', 700 + i * 25, 3, .1, .003, i * .035); thump(70, .2, .25, .5); },
+    };
+  })();
+  const sndBtn = wrap.querySelector('.snd');
+  const drawSnd = () => {
+    sndBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/>' + (sfx.on ? '<path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>' : '<path d="m22 9-6 6M16 9l6 6"/>') + '</svg>';
+    sndBtn.setAttribute('aria-label', sfx.on ? 'Mute sound' : 'Turn sound on');
+  };
+  sndBtn.onclick = () => { sfx.toggle(); drawSnd(); };
+  drawSnd();
+
   // ----- animation -----
-  function place(car, s, speed){
-    const p = pose(s, car.lane);
-    const drift = turn(s, 26) * clamp(speed / VMAX, 0, 1) * .7;   // slot cars hang the tail out in corners
-    car.g.setAttribute('transform', `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${((p.a + drift) * 180 / Math.PI).toFixed(2)})`);
+  function place(car, dt){
+    const p = pose(car.s, car.lane);
+    const drift = turn(car.s, 26 * car.dir) * clamp(car.v / VMAX, 0, 1) * .35;
+    const want = p.a + (car.dir < 0 ? Math.PI : 0) + drift;
+    if (car.ang == null) car.ang = want;
+    let d = want - car.ang;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    car.ang += d * (1 - Math.exp(-dt * 12));
+    car.ang = Math.atan2(Math.sin(car.ang), Math.cos(car.ang));
+    car.g.setAttribute('transform', `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${(car.ang * 180 / Math.PI).toFixed(2)})`);
   }
   let last = performance.now();
   function frame(now){
     const dt = Math.min(.05, (now - last) / 1000); last = now;
-    // the rival just laps, braking for the bends
-    const want = 430 - Math.min(1, Math.abs(turn(rival.s, 60)) / 1.2) * 190;
-    rival.v += clamp(want - rival.v, -A * dt, A * .6 * dt);
-    rival.s = (rival.s + rival.v * dt) % len;
-    place(rival, rival.s, rival.v);
-    rival.g.classList.add('lit');
-
     let braking = false;
     if (state === 'driving'){
-      const rem = ((stops[target] - me.s) % len + len) % len;
+      const t = stops[target];
+      const rem = me.dir > 0 ? ((t - me.s) % len + len) % len : ((me.s - t) % len + len) % len;
       const nv = Math.max(30, Math.min(VMAX, me.v + A * dt, Math.sqrt(2 * A * rem)));
       braking = nv < me.v - 1;
+      if (braking && me.v > 480 && !me.screeched){ sfx.screech(); me.screeched = true; }
+      if (!braking) me.screeched = false;
       me.v = nv;
       const step = me.v * dt;
-      if (step >= rem){ me.s = stops[target]; me.v = 0; arrive(target); }
-      else me.s = (me.s + step) % len;
+      if (step >= rem){ me.s = t; me.v = 0; arrive(target); }
+      else me.s = ((me.s + me.dir * step) % len + len) % len;
     }
-    place(me, me.s, me.v);
+    // keep left: which side of the centre line depends on the direction of travel
+    me.lane += ((me.dir > 0 ? -LANE : LANE) - me.lane) * (1 - Math.exp(-dt * 5));
+    place(me, dt);
     me.g.classList.toggle('lit', state === 'driving');
     me.g.classList.toggle('braking', braking);
+    sfx.engine(state === 'driving', me.v);
 
     if (walk){
       walk.t = Math.min(1, walk.t + dt / Math.max(walk.dur, .2));
@@ -756,10 +838,12 @@ const sel = document.getElementById('service');
       const bob = 1.4 + Math.sin(k * walk.dur * 18) * .1;
       person.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a.toFixed(1)}) scale(${bob.toFixed(3)})`);
       person.setAttribute('opacity', clamp(Math.min(k, 1 - k) * 8, 0, 1));
+      const n = Math.floor(k * walk.dur / .3);
+      if (n > walk.steps){ walk.steps = n; sfx.step(); }
       if (k === 1){
         walk = null; person.setAttribute('opacity', 0);
         if (state === 'walkOut') openRoom(here);
-        else { state = 'idle'; flush(); }
+        else { sfx.door(); state = 'idle'; flush(); }
       }
     }
     requestAnimationFrame(frame);
