@@ -71,8 +71,25 @@ nav a:hover,nav a.active{color:var(--ink)}
 .drive-hint b{color:var(--ink);font-weight:700}
 .drive-hint.go{color:var(--ink);border-color:var(--brand)}
 .drive-hint.go b{color:var(--brand)}
+.hp{position:absolute;left:10px;top:48px;z-index:2;display:flex;align-items:center;gap:8px;background:rgba(11,12,14,.82);border:1px solid var(--line);border-radius:4px;padding:6px 10px;font-size:.62rem;font-weight:700;letter-spacing:.16em;color:var(--muted);pointer-events:none}
+.hp[hidden]{display:none}
+.hp i{display:block;width:74px;height:6px;border-radius:3px;background:#2a2d32;overflow:hidden}
+.hp i b{display:block;height:100%;width:100%;background:#4caf6a;transition:width .2s,background .3s}
+.hp span{min-width:3ch;color:var(--ink)}
+.hp.warn i b{background:#e0a21b}
+.hp.bad i b{background:#e5452b}
+.hp.bad{border-color:#e5452b}
+#town.shake{animation:shake .32s linear}
+@keyframes shake{20%{transform:translate(-4px,2px)}40%{transform:translate(4px,-3px)}60%{transform:translate(-3px,-2px)}80%{transform:translate(2px,3px)}}
+.car .ind{fill:transparent}
+.car.hazard .ind,.van .bar{animation:haz .7s steps(1) infinite}
+@keyframes haz{50%{fill:#ffae00}}
+.garage-glow{fill:#3b3e44;transition:fill .3s}
+.garage.fixing .garage-glow{fill:#4caf6a;filter:drop-shadow(0 0 6px #4caf6a)}
+.g-label{font:700 11px Inter,sans-serif;fill:rgba(232,86,31,.85);letter-spacing:.24em;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
 .pad{display:none}
 @media (pointer:coarse){
+  .hp{top:10px}
   .drive-hint{top:auto;bottom:10px;max-width:calc(100% - 190px);font-size:.6rem;line-height:1.5}
   .pad{display:grid;position:absolute;right:10px;bottom:10px;z-index:2;grid-template-columns:repeat(3,46px);grid-template-rows:46px 46px;gap:6px}
   .pad button{border:1px solid var(--line);border-radius:6px;background:rgba(11,12,14,.78);color:var(--ink);font-size:.9rem;touch-action:none;user-select:none;-webkit-user-select:none}
@@ -260,6 +277,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     <div class="town-wrap">
       <button class="snd" type="button" aria-label="Mute sound"></button>
       <div class="drive-hint" aria-live="polite"></div>
+      <div class="hp" hidden>CAR <i><b></b></i><span>100</span></div>
       <div class="pad" aria-label="Driving controls">
         <button type="button" data-k="e" aria-label="Get out">E</button>
         <button type="button" data-k="up" aria-label="Accelerate">▲</button>
@@ -476,10 +494,12 @@ const sel = document.getElementById('service');
   const LAYOUTS = {
     wide: {w:1000, h:660, bw:150, bh:74,
       track:'M170 150 H830 A100 100 0 0 1 930 250 V430 A100 100 0 0 1 830 530 H620 C560 530 560 440 500 440 C440 440 440 530 380 530 H170 A100 100 0 0 1 70 430 V250 A100 100 0 0 1 170 150 Z',
-      at:{services:[320,62], about:[680,62], pricing:[790,320], process:[500,300], reviews:[210,320], faq:[260,606], contact:[740,606]}},
+      at:{services:[320,62], about:[680,62], pricing:[790,320], process:[500,300], reviews:[210,320], faq:[260,606], contact:[740,606]},
+      garage:{x:190, y:410, w:120, h:62, open:'right'}},
     tall: {w:600, h:1000, bw:140, bh:74,
       track:'M200 120 H400 A100 100 0 0 1 500 220 V780 A100 100 0 0 1 400 880 H200 A100 100 0 0 1 100 780 V220 A100 100 0 0 1 200 120 Z',
-      at:{services:[300,50], about:[385,300], pricing:[215,300], process:[385,500], reviews:[215,500], faq:[215,700], contact:[300,950]}},
+      at:{services:[300,50], about:[385,300], pricing:[215,300], process:[385,500], reviews:[215,500], faq:[215,700], contact:[300,950]},
+      garage:{x:325, y:672, w:120, h:62, open:'top'}},
   };
   const LANE = 18, A = 950, VMAX = 820, WALK = 95;
   const el = (tag, attrs = {}, parent) => {
@@ -501,7 +521,7 @@ const sel = document.getElementById('service');
   })();
 
   let layoutKey, L, path, len, stops = {}, bld = {};
-  let obs = [], me, person, state = 'idle', target = null, here = null, pending = null, walk = null;
+  let obs = [], fx = [], fxLayer, garage, van = null, repair = null, toast = null, vanGuy, me, person, state = 'idle', target = null, here = null, pending = null, walk = null;
 
   // position on the centre line + sideways offset
   function pose(s, lane){
@@ -535,6 +555,15 @@ const sel = document.getElementById('service');
     el('rect', {x:20, y:4.5, width:2.5, height:4.5, rx:1, fill:'#e9f1ff'}, g);
     el('rect', {x:-22.8, y:-9, width:2, height:5, class:'tail'}, g);
     el('rect', {x:-22.8, y:4, width:2, height:5, class:'tail'}, g);
+    [[19, -11.5], [19, 9], [-21, -11.5], [-21, 9]].forEach(([x, y]) => el('rect', {x, y, width:3, height:2.5, rx:1, class:'ind'}, g));
+    if (id === 'me'){
+      // dents, scrapes and a cracked screen, faded in as damage builds
+      const d = el('g', {class:'dmg', opacity:0}, g);
+      el('ellipse', {cx:16, cy:-6, rx:4, ry:2.5, fill:'rgba(0,0,0,.45)'}, d);
+      el('ellipse', {cx:-15, cy:8, rx:5, ry:2, fill:'rgba(0,0,0,.4)'}, d);
+      el('path', {d:'M-18 -9 l7 3 l-4 1 l6 2 M2 9 l6 -2 l-3 -1 l5 -1', stroke:'#c9c9c9', 'stroke-width':.7, fill:'none', opacity:.8}, d);
+      el('path', {d:'M5 -7 L8 -2 L6 1 L9 5 M8 -2 L11 -3', stroke:'#cfe3ff', 'stroke-width':.6, fill:'none'}, d);
+    }
     return g;
   }
 
@@ -631,6 +660,27 @@ const sel = document.getElementById('service');
       obs.push([x0, y0, x0 + bw, y0 + bh]);
     });
 
+    // Quick Fix garage: three walls, open on one side, drive in and stop to repair
+    {
+      const G = L.garage, t = 6, {x, y, w, h} = G;
+      const g = el('g', {class:'garage'}, svg);
+      el('rect', {x:x + 6, y:y + 8, width:w, height:h, fill:'rgba(0,0,0,.45)'}, g);
+      el('rect', {x, y, width:w, height:h, fill:'#26282c'}, g);
+      const walls = G.open === 'right' ? [[x, y, w, t], [x, y + h - t, w, t], [x, y, t, h]] : [[x, y, t, h], [x + w - t, y, t, h], [x, y + h - t, w, t]];
+      walls.forEach(([a, b, c, d]) => { el('rect', {x:a, y:b, width:c, height:d, fill:'#44474d', stroke:'#1a1b1e'}, g); obs.push([a, b, a + c, b + d]); });
+      // hazard striping across the open side, a light strip on the back wall
+      const stripe = G.open === 'right' ? {x:x + w - 6, y:y + t, width:6, height:h - 2 * t} : {x:x + t, y, width:w - 2 * t, height:6};
+      el('rect', {...stripe, fill:'#b8931f'}, g);
+      el('rect', {...stripe, fill:'url(#chk)', opacity:.35}, g);
+      const glow = G.open === 'right' ? {x:x + t + 2, y:y + 12, width:3, height:h - 24} : {x:x + 12, y:y + h - t - 5, width:w - 24, height:3};
+      el('rect', {...glow, class:'garage-glow'}, g);
+      const lx = G.open === 'right' ? x + w / 2 + 4 : x + w / 2, ly = G.open === 'right' ? y + h / 2 : y + h / 2 - 4;
+      el('text', {x:lx, y:ly, class:'g-label'}, g).textContent = 'QUICK FIX';
+      garage = {g, inner: G.open === 'right' ? [x + t, y + t, x + w, y + h - t] : [x + t, y, x + w - t, y + h - t]};
+      boxes.push([x - 30, y - 30, x + w + 30, y + h + 30]);
+      boxes.push(G.open === 'right' ? [x + w, y - 10, x + w + 90, y + h + 10] : [x - 10, y - 90, x + w + 10, y]);
+    }
+
     // yard clutter in the spare space: containers, tyre stacks, pallets, oil
     const samples = [];
     for (let s = 0; s < len; s += 12) samples.push(path.getPointAtLength(s));
@@ -677,11 +727,21 @@ const sel = document.getElementById('service');
     // free-driven positions don't survive a layout swap, so snap back onto the road
     me.free = false; me.blend = null;
     if (here) me.s = stops[here];
-    person = el('g', {class:'person', opacity:0}, svg);
-    el('ellipse', {cx:0, cy:0, rx:4.5, ry:7.5, fill:'#23262b'}, person);
-    el('path', {d:'M-3.5 -6.5V6.5M1.5 -7V7', stroke:'#ff7a1a', 'stroke-width':1.3}, person);
-    el('circle', {cx:0, cy:0, r:3.6, fill:'#a57f60'}, person);
-    el('path', {d:'M-3.6 0 A3.6 3.6 0 0 1 3.6 0 Z', fill:'#15171a', transform:'rotate(-90)'}, person);
+    const makePerson = (jacket, stripe) => {
+      const g = el('g', {class:'person', opacity:0}, svg);
+      el('ellipse', {cx:0, cy:0, rx:4.5, ry:7.5, fill:jacket}, g);
+      el('path', {d:'M-3.5 -6.5V6.5M1.5 -7V7', stroke:stripe, 'stroke-width':1.3}, g);
+      el('circle', {cx:0, cy:0, r:3.6, fill:'#a57f60'}, g);
+      el('path', {d:'M-3.6 0 A3.6 3.6 0 0 1 3.6 0 Z', fill:'#15171a', transform:'rotate(-90)'}, g);
+      return g;
+    };
+    person = makePerson('#23262b', '#ff7a1a');
+    vanGuy = makePerson('#d8c21a', '#2a2a2a');
+    fxLayer = el('g', {'pointer-events':'none'}, svg);
+    fx = [];
+    // a layout swap mid-job: skip to the end rather than strand the ute or the repair
+    if (van || repair || me.broken){ van = null; repair = null; me.broken = false; me.hp = 100; }
+    me.hp = me.hp ?? 100;
 
     if (target) bld[target].g.classList.add('target');
     if (here && isOpen()) bld[here].doorEl.classList.add('open');
@@ -693,6 +753,7 @@ const sel = document.getElementById('service');
   function go(id){
     if (!stops[id]) return;
     if (state === 'walkOut' || state === 'inside') return;
+    if (me.broken || repair){ pending = id; return; }
     if (state === 'walkBack'){ pending = id; return; }
     Object.values(bld).forEach(b => b.g.classList.remove('target'));
     if (here === id && state === 'idle' && !me.free){ arrive(id); return; }
@@ -834,6 +895,13 @@ const sel = document.getElementById('service');
       g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
       o.connect(g).connect(out); o.start(t); o.stop(t + dur + .05);
     }
+    function tone(freq, dur, vol, when = 0){
+      if (!ctx) return;
+      const t = ctx.currentTime + when, o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+      o.connect(g).connect(out); o.start(t); o.stop(t + dur + .05);
+    }
     const GEARS = [0, 200, 420, 640, VMAX];
     return {
       init,
@@ -860,6 +928,11 @@ const sel = document.getElementById('service');
       door(){ noise(.12, 'lowpass', 500, 1, .5); thump(90, .15, .5); },
       step(){ noise(.05, 'bandpass', 1000 + Math.random() * 400, 2, .14, .003); },
       bump(){ thump(60, .18, .5); noise(.15, 'lowpass', 800, 1, .35); },
+      crash(k){ noise(.25 + .25 * k, 'lowpass', 900 + 1800 * k, 1, .3 + .45 * k); thump(70, .25, .45 + .35 * k); noise(.12, 'bandpass', 3400, 5, .2 * k, .002, .02); },
+      breakdown(){ for (let i = 0; i < 6; i++) thump(52 - i * 5, .12, .4 - i * .05, i * .2); noise(1.4, 'bandpass', 4200, 1, .09, .25, 1.1); },
+      ratchet(){ for (let i = 0; i < 4; i++) noise(.025, 'highpass', 2600, 1, .16, .002, i * .055); },
+      ding(){ tone(1320, .7, .16); tone(1980, .6, .07, .06); },
+      beep(){ tone(760, .13, .12); tone(760, .13, .12, .22); },
       screech(){ noise(.45, 'bandpass', 2400, 6, .07, .03); },
       roller(){ for (let i = 0; i < 14; i++) noise(.04, 'bandpass', 700 + i * 25, 3, .1, .003, i * .035); thump(70, .2, .25, .5); },
     };
@@ -898,7 +971,7 @@ const sel = document.getElementById('service');
   const hintEl = wrap.querySelector('.drive-hint');
   let hintHTML = null;
   function drive(dt){
-    const canDrive = state === 'idle';
+    const canDrive = state === 'idle' && !me.broken && !repair;
     const thr = canDrive ? keys.up - keys.down : 0, steer = canDrive ? keys.right - keys.left : 0;
     if (thr > 0) me.v += (me.v < 0 ? 1400 : 650) * dt;
     else if (thr < 0) me.v -= (me.v > 0 ? 1400 : 420) * dt;
@@ -912,20 +985,213 @@ const sel = document.getElementById('service');
     me.y += Math.sin(me.ang) * me.v * dt;
     // yard edges, bays and clutter are solid
     const R = 13;
-    const bump = () => { if (Math.abs(me.v) > 90) sfx.bump(); me.v *= -.25; };
-    if (me.x < R || me.x > L.w - R || me.y < R || me.y > L.h - R){ me.x = clamp(me.x, R, L.w - R); me.y = clamp(me.y, R, L.h - R); bump(); }
+    let hit = false;
+    if (me.x < R || me.x > L.w - R || me.y < R || me.y > L.h - R){ me.x = clamp(me.x, R, L.w - R); me.y = clamp(me.y, R, L.h - R); hit = true; }
     for (const [a, b, c, d] of obs){
       if (me.x <= a - R || me.x >= c + R || me.y <= b - R || me.y >= d + R) continue;
       const push = [me.x - (a - R), c + R - me.x, me.y - (b - R), d + R - me.y], m = Math.min(...push);
       if (m === push[0]) me.x = a - R; else if (m === push[1]) me.x = c + R; else if (m === push[2]) me.y = b - R; else me.y = d + R;
-      bump();
+      hit = true;
+    }
+    if (hit) crash(Math.abs(me.v));
+    // rolled to a stop inside the Quick Fix garage: fix it
+    const gi = garage.inner;
+    if (!repair && !me.broken && me.hp < 100 && Math.abs(me.v) < 40 && me.x > gi[0] && me.x < gi[2] && me.y > gi[1] && me.y < gi[3]){
+      repair = {t:0, dur:1.6, from:me.hp, tick:0};
+      me.v = 0;
+      garage.g.classList.add('fixing');
     }
     me.g.setAttribute('transform', `translate(${me.x.toFixed(2)} ${me.y.toFixed(2)}) rotate(${(me.ang * 180 / Math.PI).toFixed(2)})`);
     return braking;
   }
+  function crash(speed){
+    const front = Math.sign(me.v) || 1;
+    me.v *= -.25;
+    if (speed < 90) return;
+    const k = clamp(speed / 560, 0, 1);
+    me.hp = Math.max(0, me.hp - (speed - 80) * .09);
+    sfx.crash(k);
+    const cx = me.x + Math.cos(me.ang) * 18 * front, cy = me.y + Math.sin(me.ang) * 18 * front;
+    for (let i = 0; i < 6 + k * 14; i++) particle(cx, cy, 'spark');
+    if (speed > 300){ svg.classList.remove('shake'); void svg.getBBox(); svg.classList.add('shake'); }
+    if (me.hp <= 0) breakDown();
+  }
+  function breakDown(){
+    me.broken = true; me.hp = 0; me.v = 0;
+    me.g.classList.add('hazard');
+    sfx.breakdown();
+    setTimeout(() => { if (me.broken && !van) dispatchVan(); }, 1200);
+  }
+  function fixed(msg){
+    me.hp = 100; me.broken = false; repair = null;
+    me.g.classList.remove('hazard');
+    garage.g.classList.remove('fixing');
+    sfx.ding();
+    toast = {html:msg, until:performance.now() + 3200};
+    if (state === 'idle') flush();
+  }
+  function particle(x, y, kind){
+    if (fx.length > 180) return;
+    const a = Math.random() * Math.PI * 2;
+    if (kind === 'spark'){
+      const sp = 120 + Math.random() * 260;
+      fx.push({e: el('line', {stroke:'#ffc266', 'stroke-width':1.6, 'stroke-linecap':'round'}, fxLayer), kind, x, y, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp, life:0, max:.25 + Math.random() * .25});
+    } else {
+      const dark = kind === 'black';
+      fx.push({e: el('circle', {fill: dark ? '#1c1c1c' : '#9a9a9a'}, fxLayer), kind, x, y, vx:Math.cos(a) * 8 + 10, vy:Math.sin(a) * 8 - 14, life:0, max:1.1 + Math.random() * .8, base: dark ? .75 : .45});
+    }
+  }
+  function stepFx(dt){
+    for (let i = fx.length - 1; i >= 0; i--){
+      const f = fx[i];
+      f.life += dt;
+      if (f.life >= f.max){ f.e.remove(); fx.splice(i, 1); continue; }
+      const k = f.life / f.max;
+      f.x += f.vx * dt; f.y += f.vy * dt;
+      if (f.kind === 'spark'){
+        f.vx *= .9; f.vy *= .9;
+        f.e.setAttribute('x1', f.x.toFixed(1)); f.e.setAttribute('y1', f.y.toFixed(1));
+        f.e.setAttribute('x2', (f.x - f.vx * .03).toFixed(1)); f.e.setAttribute('y2', (f.y - f.vy * .03).toFixed(1));
+        f.e.setAttribute('opacity', (1 - k).toFixed(2));
+      } else {
+        f.e.setAttribute('cx', f.x.toFixed(1)); f.e.setAttribute('cy', f.y.toFixed(1));
+        f.e.setAttribute('r', (3 + k * 11).toFixed(1));
+        f.e.setAttribute('opacity', (f.base * (1 - k)).toFixed(2));
+      }
+    }
+  }
+
+  // ----- roadside assist: a ute leaves Services, drives round to you, fixes you, goes home -----
+  function makeVan(){
+    const g = el('g', {class:'car van', opacity:0});
+    svg.insertBefore(g, me.g);
+    el('polygon', {points:'26,-9 26,9 150,46 150,-46', class:'beam', fill:'url(#beam)'}, g);
+    el('ellipse', {cx:2, cy:4, rx:30, ry:16, fill:'rgba(0,0,0,.55)'}, g);
+    [[-20, -14], [10, -14], [-20, 9], [10, 9]].forEach(([x, y]) => el('rect', {x, y, width:11, height:5, rx:1.5, fill:'#070707'}, g));
+    el('rect', {x:-27, y:-12, width:54, height:24, rx:4, fill:'#d9d6cf', stroke:'rgba(0,0,0,.6)'}, g);
+    el('rect', {x:-26, y:-10, width:22, height:20, fill:'#6f6c66'}, g);
+    el('path', {d:'M-24 -6H-6M-24 0H-6M-24 6H-6', stroke:'#4a4843', 'stroke-width':1}, g);
+    el('rect', {x:-20, y:-7, width:8, height:5, fill:'#b33a1a'}, g);
+    el('path', {d:'M13 -10 L20 -8 Q21.5 0 20 8 L13 10 Z', fill:'#0b0e12'}, g);
+    el('rect', {x:-1, y:-10, width:14, height:20, rx:2, fill:'#c9c5bc'}, g);
+    el('rect', {x:3, y:-10, width:4, height:20, class:'bar', fill:'#6a4a0c'}, g);
+    el('rect', {x:24, y:-10, width:2.5, height:5, rx:1, fill:'#e9f1ff'}, g);
+    el('rect', {x:24, y:5, width:2.5, height:5, rx:1, fill:'#e9f1ff'}, g);
+    el('rect', {x:-27.5, y:-10, width:2, height:5, class:'tail'}, g);
+    el('rect', {x:-27.5, y:5, width:2, height:5, class:'tail'}, g);
+    g.classList.add('lit');
+    return g;
+  }
+  const nearestS = (x, y) => {
+    let best = 0, bd = Infinity;
+    for (let s = 0; s < len; s += 4){ const p = path.getPointAtLength(s), d = (p.x - x) ** 2 + (p.y - y) ** 2; if (d < bd){ bd = d; best = s; } }
+    return best;
+  };
+  const shortDir = (from, to) => { const f = ((to - from) % len + len) % len; return f <= len - f ? 1 : -1; };
+  function dispatchVan(){
+    const home = stops.services, meet = nearestS(me.x, me.y), dir = shortDir(home, meet);
+    const lane = dir > 0 ? -LANE : LANE, start = pose(home, lane);
+    van = {g: makeVan(), phase:'out', s:home, dir, lane, laneT:lane, v:0, meet, ang:null, x:bld.services.door.x, y:bld.services.door.y};
+    legTo(start, .9);
+  }
+  function legTo(pt, dur){ van.leg = {from:{x:van.x, y:van.y}, to:{x:pt.x, y:pt.y}, t:0, dur}; }
+  function vanRoad(dt, targetS){
+    const rem = van.dir > 0 ? ((targetS - van.s) % len + len) % len : ((van.s - targetS) % len + len) % len;
+    van.v = Math.max(30, Math.min(VMAX * .75, van.v + A * dt, Math.sqrt(2 * A * rem)));
+    van.lane += (van.laneT - van.lane) * (1 - Math.exp(-dt * 4));
+    const step = van.v * dt;
+    if (step >= rem){ van.s = targetS; van.v = 0; } else van.s = ((van.s + van.dir * step) % len + len) % len;
+    const p = pose(van.s, van.lane);
+    van.x = p.x; van.y = p.y;
+    return van.v === 0;
+  }
+  function walkGuy(k, from, to){
+    const x = from.x + (to.x - from.x) * k, y = from.y + (to.y - from.y) * k;
+    const a = Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI;
+    vanGuy.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a.toFixed(1)}) scale(${(1.4 + Math.sin(k * 20) * .1).toFixed(3)})`);
+    vanGuy.setAttribute('opacity', clamp(Math.min(k, 1 - k) * 10, 0, 1));
+  }
+  function stepVan(dt){
+    const V = van;
+    let moved = true;
+    if (V.leg){
+      const L2 = V.leg;
+      L2.t = Math.min(1, L2.t + dt / L2.dur);
+      const k = L2.t < .5 ? 2 * L2.t * L2.t : 1 - (-2 * L2.t + 2) ** 2 / 2;
+      V.x = L2.from.x + (L2.to.x - L2.from.x) * k; V.y = L2.from.y + (L2.to.y - L2.from.y) * k;
+      if (V.phase === 'out') V.g.setAttribute('opacity', Math.min(1, L2.t * 3));
+      if (V.phase === 'in') V.g.setAttribute('opacity', Math.min(1, (1 - L2.t) * 3));
+      V.head = Math.atan2(L2.to.y - L2.from.y, L2.to.x - L2.from.x);
+      if (L2.t === 1){
+        V.leg = null;
+        if (V.phase === 'out'){ V.phase = 'road'; }
+        else if (V.phase === 'approach'){
+          V.phase = 'walk';
+          sfx.beep();
+          V.walk = {from:{x:V.x, y:V.y}, to:{x:me.x + Math.cos(me.ang) * 30, y:me.y + Math.sin(me.ang) * 30}, t:0};
+        } else if (V.phase === 'leave'){ V.phase = 'home'; V.dir = shortDir(V.s, stops.services); V.laneT = V.dir > 0 ? -LANE : LANE; }
+        else if (V.phase === 'in'){ V.g.remove(); van = null; return; }
+      }
+    } else if (V.phase === 'road' || V.phase === 'home'){
+      const done = vanRoad(dt, V.phase === 'road' ? V.meet : stops.services);
+      const p = pose(V.s, 0);
+      V.head = p.a + (V.dir < 0 ? Math.PI : 0);
+      if (done && V.phase === 'road'){
+        // pull off the road and park beside the broken-down car
+        const d = Math.hypot(me.x - V.x, me.y - V.y);
+        V.phase = 'approach'; V.roadPt = {x:V.x, y:V.y};
+        const park = d < 75 ? {x:V.x, y:V.y} : {x:me.x + (V.x - me.x) / d * 60, y:me.y + (V.y - me.y) / d * 60};
+        legTo(park, .3 + Math.hypot(park.x - V.x, park.y - V.y) / 220);
+      } else if (done){ V.phase = 'in'; legTo(bld.services.door, .9); }
+    } else moved = false;
+
+    if (V.phase === 'walk' || V.phase === 'walkBack'){
+      const W2 = V.walk, dist = Math.hypot(W2.to.x - W2.from.x, W2.to.y - W2.from.y);
+      W2.t = Math.min(1, W2.t + dt * WALK / Math.max(dist, 12));
+      walkGuy(W2.t, W2.from, W2.to);
+      if (W2.t === 1){
+        if (V.phase === 'walk'){ V.phase = 'fix'; V.fix = {t:0, tick:0}; }
+        else { vanGuy.setAttribute('opacity', 0); V.phase = 'leave'; V.s = nearestS(V.roadPt.x, V.roadPt.y); legTo(V.roadPt, .3 + Math.hypot(V.roadPt.x - V.x, V.roadPt.y - V.y) / 220); }
+      }
+    } else if (V.phase === 'fix'){
+      V.fix.t += dt;
+      me.hp = Math.min(100, V.fix.t / 2.4 * 100);
+      if (V.fix.t - V.fix.tick > .3){ V.fix.tick = V.fix.t; sfx.ratchet(); for (let i = 0; i < 4; i++) particle(V.walk.to.x, V.walk.to.y, 'spark'); }
+      if (V.fix.t >= 2.4){
+        fixed('<b>Fixed roadside</b> in under 3 s · no tow, no fuss');
+        V.phase = 'walkBack'; V.walk = {from:V.walk.to, to:{x:V.x, y:V.y}, t:0};
+      }
+    }
+    if (V.head != null){
+      if (V.ang == null) V.ang = V.head;
+      let d = V.head - V.ang;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      if (moved) V.ang += d * (1 - Math.exp(-dt * 10));
+    }
+    V.g.setAttribute('transform', `translate(${V.x.toFixed(2)} ${V.y.toFixed(2)}) rotate(${((V.ang || 0) * 180 / Math.PI).toFixed(2)})`);
+  }
+
+  const hpEl = wrap.querySelector('.hp'), hpBar = hpEl.querySelector('b'), hpNum = hpEl.querySelector('span');
+  let hpShown = -1;
+  function updateHp(){
+    const v = Math.round(me.hp);
+    hpEl.hidden = !(me.free || v < 100) || isOpen();
+    if (v === hpShown) return;
+    hpShown = v;
+    hpBar.style.width = v + '%';
+    hpNum.textContent = v;
+    hpEl.classList.toggle('warn', v <= 60 && v > 30);
+    hpEl.classList.toggle('bad', v <= 30);
+  }
   function updateHint(){
     let h = '', go = false;
-    if (state === 'idle' && me.free && Math.abs(me.v) < 60){
+    if (toast && performance.now() > toast.until) toast = null;
+    if (repair){ h = `<b>Quick Fix</b> Repairing… ${Math.round(me.hp)}%`; go = true; }
+    else if (me.broken && state === 'idle') { h = van && van.phase === 'fix' ? '<b>Roadside assist</b> Fixing your car…' : '<b>Broken down</b> Roadside assist is on the way'; go = true; }
+    else if (toast && (state === 'idle' || state === 'driving')){ h = toast.html; go = true; }
+    else if (state === 'idle' && me.free && me.hp < 70 && Math.abs(me.v) < 60){ h = 'Banged up? Roll into <b>Quick Fix</b> · or <b>E</b> walk into a bay'; go = true; }
+    else if (state === 'idle' && me.free && Math.abs(me.v) < 60){
       const pl = PLACES.find(p => p.id === nearestBay());
       h = `<b>E</b> Walk into ${pl.bay} · ${pl.name}`; go = true;
     } else if (state === 'idle' || state === 'driving')
@@ -974,12 +1240,28 @@ const sel = document.getElementById('service');
       me.lane += ((me.dir > 0 ? -LANE : LANE) - me.lane) * (1 - Math.exp(-dt * 5));
       place(me, dt);
     }
-    const manualRun = me.free && (Math.abs(me.v) > 5 || (state === 'idle' && (keys.up || keys.down)));
+    const manualRun = me.free && !me.broken && (Math.abs(me.v) > 5 || (state === 'idle' && (keys.up || keys.down)));
     engineOn = state === 'driving' || manualRun;
     me.g.classList.toggle('lit', engineOn);
     me.g.classList.toggle('braking', braking);
     sfx.engine(engineOn, me.free ? Math.abs(me.v) * 1.4 : me.v);
+    // garage repair, smoke from a damaged engine, the ute, particles
+    if (repair){
+      repair.t += dt;
+      me.hp = repair.from + (100 - repair.from) * Math.min(1, repair.t / repair.dur);
+      if (repair.t - repair.tick > .25){ repair.tick = repair.t; sfx.ratchet(); for (let i = 0; i < 3; i++) particle(me.x + Math.cos(me.ang) * 16, me.y + Math.sin(me.ang) * 16, 'spark'); }
+      if (repair.t >= repair.dur) fixed('<b>Quick Fix</b> Good as new in 1.6 s · no forms, no waiting');
+    }
+    const dmg = 1 - me.hp / 100;
+    me.g.querySelector('.dmg').setAttribute('opacity', dmg.toFixed(2));
+    if (me.hp < 55 && Math.random() < dt * (me.broken ? 22 : 4 + dmg * 14)){
+      const c = carPos(), a = me.free ? me.ang : me.ang ?? 0;
+      particle(c.x + Math.cos(a) * 14, c.y + Math.sin(a) * 14, me.broken || me.hp < 25 ? 'black' : 'grey');
+    }
+    if (van) stepVan(dt);
+    stepFx(dt);
     updateHint();
+    updateHp();
 
     if (walk){
       walk.t = Math.min(1, walk.t + dt / Math.max(walk.dur, .2));
@@ -999,6 +1281,8 @@ const sel = document.getElementById('service');
     requestAnimationFrame(frame);
   }
 
+  // ?dev exposes the yard's live state for poking at from devtools
+  if (/[?&]dev/.test(location.search)) window.__yard = {get me(){ return me; }, get van(){ return van; }, get repair(){ return repair; }, get garage(){ return garage; }, get state(){ return state; }};
   const pick = () => wrap.clientWidth < 640 ? 'tall' : 'wide';
   build(pick());
   addEventListener('resize', () => { if (pick() !== layoutKey) build(pick()); });
