@@ -12,11 +12,10 @@
 :root{
   --bg:#f6f5f2; --surface:#ffffff; --ink:#16181c; --muted:#5d636d; --line:#e2e0db;
   --brand:#e8491d; --brand-ink:#ffffff; --dark:#15171b; --dark-2:#1f2227;
-  --road:96px; --car-w:30px; --car-h:56px; --asphalt:#2b2e33;
   --radius:12px; --shadow:0 10px 30px rgba(0,0,0,.08);
 }
 *{box-sizing:border-box}
-body{margin:0;position:relative;padding-left:var(--road);background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,sans-serif}
 img{max-width:100%;display:block}
 a{color:inherit}
 h1,h2,h3{font-family:Oswald,Impact,sans-serif;letter-spacing:.02em;line-height:1.15;margin:0 0 .5em;text-transform:uppercase}
@@ -43,27 +42,42 @@ nav a{text-decoration:none;font-weight:500;opacity:.85}
 nav a:hover{opacity:1;color:var(--brand)}
 .menu-btn{display:none;background:none;border:0;color:#fff;font-size:1.6rem;cursor:pointer}
 
-/* ---------- carousel ---------- */
-.hero{position:relative;height:min(82vh,720px);min-height:460px;overflow:hidden;background:var(--dark);padding:0}
-.slides{height:100%;display:flex;transition:transform .7s cubic-bezier(.65,0,.35,1)}
-.slide{flex:0 0 100%;position:relative;height:100%}
-.slide img{width:100%;height:100%;object-fit:cover}
-.slide.noimg{background:linear-gradient(135deg,#2a2d33,#0f1013)}
-.slide::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(10,11,13,.85) 0%,rgba(10,11,13,.45) 55%,rgba(10,11,13,.1) 100%)}
-.caption{position:absolute;inset:0;z-index:2;display:flex;align-items:center}
-.caption .wrap{width:100%;color:#fff}
-.caption h1{font-size:clamp(2.2rem,6vw,4.4rem);max-width:720px}
-.caption p{max-width:520px;color:#d6d8dc;font-size:1.1rem}
-.caption .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:1.4em}
-.car-tag{display:inline-block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);padding:.25em .8em;border-radius:999px;font-size:.8rem;margin-bottom:1em}
-.arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:3;width:48px;height:48px;border-radius:50%;border:0;background:rgba(255,255,255,.15);color:#fff;font-size:1.5rem;cursor:pointer;backdrop-filter:blur(4px)}
-.arrow:hover{background:var(--brand)}
-.arrow.prev{left:16px}.arrow.next{right:16px}
-.dots{position:absolute;bottom:22px;left:0;right:0;z-index:3;display:flex;justify-content:center;gap:10px}
-.dots button{width:12px;height:12px;border-radius:999px;border:0;background:rgba(255,255,255,.4);cursor:pointer;padding:0;transition:width .3s,background .3s}
-.dots button.on{width:34px;background:var(--brand)}
-.shuffle{position:absolute;top:16px;right:16px;z-index:3;background:rgba(0,0,0,.45);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:.4em 1em;cursor:pointer;font:inherit;font-size:.85rem}
-.shuffle:hover{background:var(--brand)}
+/* ---------- hero: slot-car town ---------- */
+.hero{background:var(--dark);color:#fff;padding:28px 0 44px}
+.hero-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px 32px;flex-wrap:wrap;margin-bottom:18px}
+.hero h1{font-size:clamp(1.7rem,4.2vw,3rem);margin:0}
+.hero-head p{margin:.3em 0 0;color:#b9bdc4}
+.hint{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.hint span{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:.45em 1em;font-size:.9rem;color:#e6e7ea}
+.town-wrap{background:#7cb35a;border:6px solid #2a2d33;border-radius:18px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.45)}
+#town{display:block;width:100%;height:auto;max-height:calc(100svh - 290px);min-height:320px;margin:0 auto;user-select:none;-webkit-tap-highlight-color:transparent}
+.bld{cursor:pointer;outline:none}
+.bld .roof{transition:filter .2s}
+.bld:hover .roof,.bld:focus-visible .roof{filter:brightness(1.15) saturate(1.1)}
+.bld:focus-visible .roof{stroke:#fff;stroke-width:4}
+.bld .ring{fill:none;stroke:#fff;stroke-width:4;stroke-dasharray:10 8;opacity:0}
+.bld.target .ring{opacity:1;animation:march .6s linear infinite}
+@keyframes march{to{stroke-dashoffset:-18}}
+.b-icon{font-size:24px;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.b-name{font:600 18px Oswald,sans-serif;fill:#fff;text-anchor:middle;text-transform:uppercase;letter-spacing:.04em;pointer-events:none;paint-order:stroke;stroke:rgba(0,0,0,.25);stroke-width:3px}
+.door{fill:#5a3a22;transition:fill .3s}
+.door.open{fill:#ffe08a}
+.car .beam{opacity:0;transition:opacity .3s}
+.car.lit .beam{opacity:1}
+.car .tail{fill:#6d1010}
+.car.braking .tail{fill:#ff3030}
+.person{pointer-events:none}
+
+/* ---------- section dialog ---------- */
+.room{padding:0;border:0;border-radius:16px;width:min(1100px,calc(100vw - 24px));max-width:none;max-height:calc(100svh - 32px);background:var(--bg);color:var(--ink);box-shadow:0 30px 80px rgba(0,0,0,.5);overflow:hidden}
+.room[open]{animation:pop .35s cubic-bezier(.2,.9,.3,1.25)}
+@keyframes pop{from{transform:scale(.8) translateY(30px);opacity:0}}
+.room::backdrop{background:rgba(10,11,13,.6);backdrop-filter:blur(3px)}
+.room-body{max-height:calc(100svh - 32px);overflow:auto;overscroll-behavior:contain}
+.room-body section{padding:52px 0 44px}
+.room .reveal{opacity:1;transform:none}
+.room-x{position:absolute;top:12px;right:12px;z-index:5;width:42px;height:42px;border-radius:50%;border:0;background:var(--brand);color:#fff;font-size:1.1rem;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.room-x:hover{filter:brightness(1.1)}
 
 /* ---------- trust strip ---------- */
 .strip{background:var(--brand);color:#fff;padding:22px 0}
@@ -162,36 +176,6 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .6s,transform .6s}
 .reveal.in{opacity:1;transform:none}
 
-/* ---------- the road: runs the full height of the page, the car drives it ---------- */
-.road{position:absolute;top:0;bottom:0;left:0;width:var(--road);z-index:40;overflow:hidden;
-  background:
-    linear-gradient(90deg,#8a8f96 0 3px,transparent 3px calc(100% - 3px),#8a8f96 calc(100% - 3px)),
-    linear-gradient(90deg,transparent 7px,#e9e9e4 7px 9px,transparent 9px calc(100% - 9px),#e9e9e4 calc(100% - 9px) calc(100% - 7px),transparent calc(100% - 7px)),
-    var(--asphalt)}
-.road::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:3px;margin-left:-1.5px;
-  background:repeating-linear-gradient(180deg,#f2c230 0 26px,transparent 26px 50px)}
-.road::after{content:"";position:absolute;left:0;right:0;bottom:0;height:28px;
-  background:repeating-conic-gradient(#fff 0 25%,#111 0 50%) 0 0/14px 14px}
-.sign{position:absolute;left:4px;right:4px;z-index:4;background:#1f7a3a;color:#fff;border:2px solid #fff;border-radius:6px;
-  font:600 .68rem/1.1 Oswald,sans-serif;text-transform:uppercase;letter-spacing:.06em;text-align:center;padding:5px 2px;
-  cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,.35);transition:background .2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sign:hover{background:#26924a}
-.sign.hit{animation:hit .9s ease}
-@keyframes hit{0%,100%{transform:scale(1)}30%{transform:scale(1.12);background:var(--brand)}}
-.paint{position:absolute;left:25%;writing-mode:vertical-rl;transform:translateX(-50%) rotate(180deg);color:rgba(255,255,255,.5);
-  font:700 1.1rem/1 Oswald,sans-serif;letter-spacing:.3em;text-transform:uppercase;pointer-events:none;user-select:none;white-space:nowrap}
-.stopline{position:absolute;left:9px;right:9px;height:5px;background:#e9e9e4;opacity:.8}
-.car{position:absolute;left:0;top:0;width:var(--car-w);height:var(--car-h);margin:calc(var(--car-h) / -2) 0 0 calc(var(--car-w) / -2);
-  will-change:transform;z-index:3;pointer-events:none;filter:drop-shadow(0 4px 3px rgba(0,0,0,.5))}
-.car svg{width:100%;height:100%;display:block;position:relative}
-.beam{position:absolute;left:-40%;right:-40%;bottom:92%;height:180%;opacity:0;transition:opacity .25s;
-  background:linear-gradient(0deg,rgba(255,244,190,.55),rgba(255,244,190,0));clip-path:polygon(30% 100%,70% 100%,100% 0,0 0)}
-.car.lit .beam{opacity:1}
-.car .tail{fill:#6d1010;transition:fill .15s}
-.car.braking .tail{fill:#ff2a2a}
-.puff{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:rgba(220,220,220,.55);
-  pointer-events:none;animation:puff .7s ease-out forwards;z-index:2}
-@keyframes puff{to{transform:scale(2.6);opacity:0}}
 nav a.active{opacity:1;color:var(--brand)}
 
 @media (max-width:900px){
@@ -200,9 +184,6 @@ nav a.active{opacity:1;color:var(--brand)}
   .about .wrap,.faq .wrap,.contact .wrap{grid-template-columns:1fr;gap:36px}
 }
 @media (max-width:720px){
-  :root{--road:52px;--car-w:20px;--car-h:37px}
-  .sign{font-size:.5rem;letter-spacing:0;padding:4px 1px;left:2px;right:2px}
-  .paint{font-size:.8rem}
   section{padding:56px 0}
   .menu-btn{display:block}
   nav ul{position:absolute;top:68px;left:0;right:0;background:var(--dark);flex-direction:column;gap:0;padding:8px 16px 16px;display:none}
@@ -211,7 +192,6 @@ nav a.active{opacity:1;color:var(--brand)}
   .services .grid,.pricing .grid,.reviews .grid,.steps{grid-template-columns:1fr}
   .strip .wrap{grid-template-columns:1fr 1fr}
   form{grid-template-columns:1fr;padding:22px}
-  .arrow{display:none}
   .topbar .hide-sm{display:none}
 }
 @media (prefers-reduced-motion:reduce){
@@ -220,24 +200,6 @@ nav a.active{opacity:1;color:var(--brand)}
 </style>
 </head>
 <body>
-
-<div class="road" id="road" aria-hidden="true">
-  <div class="car" id="car">
-    <div class="beam"></div>
-    <svg viewBox="0 0 30 56">
-      <rect x="0" y="9" width="5" height="11" rx="2" fill="#111"/><rect x="25" y="9" width="5" height="11" rx="2" fill="#111"/>
-      <rect x="0" y="37" width="5" height="11" rx="2" fill="#111"/><rect x="25" y="37" width="5" height="11" rx="2" fill="#111"/>
-      <rect x="2.5" y="1.5" width="25" height="53" rx="9" fill="#e8491d" stroke="#9e2d0c" stroke-width="1"/>
-      <rect x="13" y="1.5" width="4" height="52" fill="#fff" opacity=".85"/>
-      <path d="M6 18 Q15 13 24 18 L23 25 H7 Z" fill="#1d2a38"/>
-      <rect x="7" y="26" width="16" height="12" rx="2" fill="#c63a12"/>
-      <rect x="13" y="26" width="4" height="12" fill="#fff" opacity=".7"/>
-      <path d="M7 39 H23 L22 45 Q15 47 8 45 Z" fill="#1d2a38"/>
-      <rect x="5" y="3" width="6" height="3" rx="1.5" fill="#fff6c8"/><rect x="19" y="3" width="6" height="3" rx="1.5" fill="#fff6c8"/>
-      <rect class="tail" x="5" y="51" width="6" height="2.5" rx="1"/><rect class="tail" x="19" y="51" width="6" height="2.5" rx="1"/>
-    </svg>
-  </div>
-</div>
 
 <div class="topbar">
   <div class="wrap">
@@ -264,22 +226,19 @@ nav a.active{opacity:1;color:var(--brand)}
   </div>
 </header>
 
-<!-- ============ HERO CAROUSEL ============ -->
-<section class="hero" id="top" aria-roledescription="carousel" aria-label="Featured cars">
-  <div class="slides"></div>
-  <div class="caption"><div class="wrap">
-    <span class="car-tag" id="carTag">Now in the workshop</span>
-    <h1 id="heroTitle">Honest repairs. Fast turnaround.</h1>
-    <p id="heroText">From a quick WOF to a full engine rebuild, our certified technicians keep Auckland moving.</p>
-    <div class="actions">
-      <a class="btn" href="#contact">Book a service</a>
-      <a class="btn ghost" href="#services">Our services</a>
+<!-- ============ HERO: SLOT-CAR TOWN ============ -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-head">
+      <div>
+        <div class="eyebrow">Auckland's friendly workshop</div>
+        <h1>Honest repairs. Fast turnaround.</h1>
+        <p>Pick a building and we'll drive you there.</p>
+      </div>
+      <div class="hint"><span>🏁 Click a building</span><a class="btn" href="#contact">Book a service</a></div>
     </div>
-  </div></div>
-  <button class="arrow prev" aria-label="Previous slide">‹</button>
-  <button class="arrow next" aria-label="Next slide">›</button>
-  <button class="shuffle" title="Load a new random set of cars">🔀 Shuffle cars</button>
-  <div class="dots" role="tablist"></div>
+    <div class="town-wrap"><svg id="town" role="group" aria-label="Map of the workshop. Choose a building to visit."></svg></div>
+  </div>
 </section>
 
 <div class="strip">
@@ -290,6 +249,8 @@ nav a.active{opacity:1;color:var(--brand)}
     <div><b data-count="4.9" data-dec="1">0</b><small>Google rating</small></div>
   </div>
 </div>
+
+<div id="rooms" hidden>
 
 <!-- ============ SERVICES ============ -->
 <section class="services" id="services">
@@ -350,7 +311,7 @@ nav a.active{opacity:1;color:var(--brand)}
 </section>
 
 <!-- ============ PROCESS ============ -->
-<section id="process" style="padding-top:0">
+<section id="process">
   <div class="wrap">
     <div class="eyebrow">How it works</div>
     <h2>Four steps, zero surprises</h2>
@@ -432,10 +393,17 @@ nav a.active{opacity:1;color:var(--brand)}
   </div>
 </section>
 
+</div>
+
+<dialog id="room" class="room" aria-label="Section">
+  <button class="room-x" aria-label="Close">✕</button>
+  <div class="room-body"></div>
+</dialog>
+
 <footer>
   <div class="wrap">
     <span>© <span id="yr"></span> Torque &amp; Tread Automotive</span>
-    <span class="note">Example website — business, reviews and details are fictional. Car photos via LoremFlickr (Creative Commons).</span>
+    <span class="note">Example website — business, reviews and details are fictional. Photos via LoremFlickr (Creative Commons).</span>
   </div>
 </footer>
 
@@ -463,69 +431,259 @@ document.getElementById('serviceGrid').innerHTML = SERVICES.map(s =>
 const sel = document.getElementById('service');
 [...SERVICES.map(s => s.n), 'Basic service', 'Full service', 'Premium service', 'Something else'].forEach(n => sel.add(new Option(n, n)));
 
-// ---------- carousel of random car images ----------
-const CARS = [
-  {tag:'Sports cars', title:'Honest repairs. Fast turnaround.', text:'From a quick WOF to a full engine rebuild, our certified technicians keep Auckland moving.'},
-  {tag:'Utes & 4WDs', title:'Built for work. Serviced right.', text:'Diesel specialists for Rangers, Hiluxes and Navaras — fleet discounts available.'},
-  {tag:'Classics', title:'Old-school care for classic metal.', text:'Carburettor tuning, restorations and pre-purchase inspections for vintage cars.'},
-  {tag:'Hybrids & EVs', title:'Ready for what\'s next.', text:'High-voltage certified techs for hybrid and electric vehicle servicing.'},
-  {tag:'Everyday cars', title:'WOF while you wait.', text:'Grab a free coffee in our lounge — most WOFs done in under 45 minutes.'},
-];
-const KEYWORDS = ['sportscar','car,truck','classic,car','car,electric','car'];
-const slidesEl = document.querySelector('.slides'), dotsEl = document.querySelector('.dots');
-let idx = 0, timer, seed = Math.floor(Math.random() * 10000);
+// ---------- slot-car town: click a building, the car drives there, a passenger walks in ----------
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.getElementById('town'), holder = document.getElementById('rooms');
+  const room = document.getElementById('room'), roomBody = room.querySelector('.room-body');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const PLACES = [
+    {id:'services', name:'Services', roof:'#e8491d', icon:'🔧'},
+    {id:'about', name:'About us', roof:'#3b6fb6', icon:'🏠'},
+    {id:'pricing', name:'Pricing', roof:'#2e9e5b', icon:'💲'},
+    {id:'process', name:'How it works', roof:'#8a55c7', icon:'⚙️'},
+    {id:'reviews', name:'Reviews', roof:'#d99a12', icon:'⭐'},
+    {id:'faq', name:'FAQ', roof:'#1f9aa8', icon:'❓'},
+    {id:'contact', name:'Contact', roof:'#d43a6a', icon:'📞'},
+  ];
+  const LAYOUTS = {
+    wide: {w:1000, h:660, bw:150, bh:74,
+      track:'M170 150 H830 A100 100 0 0 1 930 250 V430 A100 100 0 0 1 830 530 H620 C560 530 560 440 500 440 C440 440 440 530 380 530 H170 A100 100 0 0 1 70 430 V250 A100 100 0 0 1 170 150 Z',
+      at:{services:[320,62], about:[680,62], pricing:[790,320], process:[500,300], reviews:[210,320], faq:[260,606], contact:[740,606]}},
+    tall: {w:600, h:1000, bw:140, bh:74,
+      track:'M200 120 H400 A100 100 0 0 1 500 220 V780 A100 100 0 0 1 400 880 H200 A100 100 0 0 1 100 780 V220 A100 100 0 0 1 200 120 Z',
+      at:{services:[300,50], about:[385,300], pricing:[215,300], process:[385,500], reviews:[215,500], faq:[215,700], contact:[300,950]}},
+  };
+  const LANE = 15, A = 950, VMAX = 820, WALK = 95;
+  const el = (tag, attrs = {}, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-function buildSlides(){
-  slidesEl.innerHTML = ''; dotsEl.innerHTML = '';
-  CARS.forEach((c, i) => {
-    const s = document.createElement('div');
-    s.className = 'slide';
-    s.setAttribute('aria-label', `${i + 1} of ${CARS.length}`);
-    const img = new Image();
-    img.alt = c.tag;
-    img.loading = i ? 'lazy' : 'eager';
-    img.src = `https://loremflickr.com/1600/900/${KEYWORDS[i]}?lock=${seed + i}`;
-    img.onerror = () => { s.classList.add('noimg'); img.remove(); };
-    s.appendChild(img);
-    slidesEl.appendChild(s);
-    const d = document.createElement('button');
-    d.setAttribute('aria-label', `Go to slide ${i + 1}`);
-    d.onclick = () => go(i, true);
-    dotsEl.appendChild(d);
+  let layoutKey, L, path, len, stops = {}, bld = {};
+  let me, rival, person, state = 'idle', target = null, here = null, pending = null, walk = null;
+
+  // position on the centre line + sideways lane offset
+  function pose(s, lane){
+    const p = path.getPointAtLength(((s % len) + len) % len), q = path.getPointAtLength(((s + 2) % len + len) % len);
+    const a = Math.atan2(q.y - p.y, q.x - p.x);
+    return {x: p.x - Math.sin(a) * lane, y: p.y + Math.cos(a) * lane, a};
+  }
+  const turn = (s, ahead) => { let d = pose(s + ahead, 0).a - pose(s, 0).a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+
+  function makeCar(color, dark, parent){
+    const g = el('g', {class:'car'}, parent);
+    el('polygon', {points:'22,-8 22,8 100,34 100,-34', class:'beam', fill:'url(#beam)'}, g);
+    el('ellipse', {cx:3, cy:5, rx:26, ry:15, fill:'rgba(0,0,0,.28)'}, g);
+    [[-16,-14],[8,-14],[-16,9],[8,9]].forEach(([x, y]) => el('rect', {x, y, width:10, height:5, rx:2, fill:'#111'}, g));
+    el('rect', {x:-22, y:-11, width:44, height:22, rx:8, fill:color, stroke:dark, 'stroke-width':1}, g);
+    el('rect', {x:-22, y:-2.5, width:44, height:5, fill:'#fff', opacity:.85}, g);
+    el('path', {d:'M4 -9 L12 -8 L12 8 L4 9 Z', fill:'#1d2a38'}, g);
+    el('rect', {x:-10, y:-8, width:13, height:16, rx:2, fill:dark}, g);
+    el('rect', {x:-17, y:-7, width:6, height:14, rx:2, fill:'#1d2a38'}, g);
+    el('rect', {x:19, y:-9, width:3, height:5, rx:1, fill:'#fff6c8'}, g);
+    el('rect', {x:19, y:4, width:3, height:5, rx:1, fill:'#fff6c8'}, g);
+    el('rect', {x:-22.5, y:-9, width:2.5, height:5, class:'tail'}, g);
+    el('rect', {x:-22.5, y:4, width:2.5, height:5, class:'tail'}, g);
+    return g;
+  }
+
+  function build(key){
+    layoutKey = key; L = LAYOUTS[key];
+    svg.innerHTML = '';
+    svg.setAttribute('viewBox', `0 0 ${L.w} ${L.h}`);
+    const defs = el('defs', {}, svg);
+    const grass = el('pattern', {id:'grass', width:24, height:24, patternUnits:'userSpaceOnUse'}, defs);
+    el('rect', {width:24, height:24, fill:'#7cb35a'}, grass);
+    el('circle', {cx:5, cy:6, r:1.6, fill:'#6aa149'}, grass);
+    el('circle', {cx:17, cy:15, r:1.3, fill:'#8cc267'}, grass);
+    const chk = el('pattern', {id:'chk', width:12, height:12, patternUnits:'userSpaceOnUse'}, defs);
+    el('rect', {width:12, height:12, fill:'#fff'}, chk);
+    el('rect', {width:6, height:6, fill:'#111'}, chk);
+    el('rect', {x:6, y:6, width:6, height:6, fill:'#111'}, chk);
+    const beam = el('linearGradient', {id:'beam', x1:0, x2:1}, defs);
+    el('stop', {offset:0, 'stop-color':'#fff4be', 'stop-opacity':.55}, beam);
+    el('stop', {offset:1, 'stop-color':'#fff4be', 'stop-opacity':0}, beam);
+    el('rect', {width:L.w, height:L.h, fill:'url(#grass)'}, svg);
+
+    // track: kerbs, asphalt, then two slots with silver rails
+    el('path', {d:L.track, fill:'none', stroke:'#fff', 'stroke-width':84}, svg);
+    el('path', {d:L.track, fill:'none', stroke:'#d63a2a', 'stroke-width':84, 'stroke-dasharray':'18 18'}, svg);
+    path = el('path', {d:L.track, fill:'none', stroke:'#3a3d42', 'stroke-width':70, 'stroke-linejoin':'round'}, svg);
+    len = path.getTotalLength();
+    [-LANE, LANE].forEach(lane => {
+      const pts = [];
+      for (let s = 0; s < len; s += 4){ const p = pose(s, lane); pts.push(p.x.toFixed(1) + ',' + p.y.toFixed(1)); }
+      const d = 'M' + pts.join(' L') + ' Z';
+      el('path', {d, fill:'none', stroke:'#b4b9c0', 'stroke-width':9}, svg);
+      el('path', {d, fill:'none', stroke:'#3a3d42', 'stroke-width':5}, svg);
+      el('path', {d, fill:'none', stroke:'#121315', 'stroke-width':2.2}, svg);
+    });
+    const st = pose(0, 0);
+    el('rect', {x:st.x - 6, y:st.y - 35, width:12, height:70, fill:'url(#chk)'}, svg);
+
+    // buildings, each with a stop on the track nearest its door
+    stops = {}; bld = {};
+    const boxes = [];
+    PLACES.forEach(pl => {
+      const [cx, cy] = L.at[pl.id], bw = L.bw, bh = L.bh;
+      let best = 0, bd = Infinity;
+      for (let s = 0; s < len; s += 2){ const p = path.getPointAtLength(s), d = (p.x - cx) ** 2 + (p.y - cy) ** 2; if (d < bd){ bd = d; best = s; } }
+      stops[pl.id] = best;
+      const sp = pose(best, 0), dx = sp.x - cx, dy = sp.y - cy;
+      const side = Math.abs(dx) / bw > Math.abs(dy) / bh;
+      const door = side ? {x: cx + Math.sign(dx) * bw / 2, y: cy} : {x: cx, y: cy + Math.sign(dy) * bh / 2};
+      const g = el('g', {class:'bld', tabindex:0, role:'button', 'aria-label':'Drive to ' + pl.name}, svg);
+      el('title', {}, g).textContent = pl.name;
+      el('rect', {class:'ring', x:cx - bw / 2 - 8, y:cy - bh / 2 - 8, width:bw + 16, height:bh + 16, rx:14}, g);
+      el('rect', {x:cx - bw / 2 + 5, y:cy - bh / 2 + 7, width:bw, height:bh, rx:8, fill:'rgba(0,0,0,.25)'}, g);
+      el('rect', {class:'roof', x:cx - bw / 2, y:cy - bh / 2, width:bw, height:bh, rx:8, fill:pl.roof}, g);
+      el('rect', {x:cx - bw / 2 + 7, y:cy - bh / 2 + 7, width:bw - 14, height:bh - 14, rx:5, fill:'rgba(255,255,255,.16)'}, g);
+      const dr = side ? {x:door.x - 5, y:door.y - 14, width:10, height:28} : {x:door.x - 14, y:door.y - 5, width:28, height:10};
+      const doorEl = el('rect', {...dr, rx:2, class:'door'}, g);
+      el('text', {x:cx, y:cy - 6, class:'b-icon'}, g).textContent = pl.icon;
+      el('text', {x:cx, y:cy + 22, class:'b-name'}, g).textContent = pl.name;
+      g.addEventListener('click', () => go(pl.id));
+      g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(pl.id); } });
+      bld[pl.id] = {g, door, doorEl};
+      boxes.push([cx - bw / 2 - 18, cy - bh / 2 - 18, cx + bw / 2 + 18, cy + bh / 2 + 18]);
+    });
+
+    // trees in the leftover grass (seeded, so they don't jump around on resize)
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const samples = [];
+    for (let s = 0; s < len; s += 12) samples.push(path.getPointAtLength(s));
+    for (let i = 0, n = 0; i < 400 && n < 26; i++){
+      const x = 18 + rnd() * (L.w - 36), y = 18 + rnd() * (L.h - 36), r = 11 + rnd() * 9;
+      if (samples.some(p => (p.x - x) ** 2 + (p.y - y) ** 2 < (52 + r) ** 2)) continue;
+      if (boxes.some(b => x > b[0] - r && x < b[2] + r && y > b[1] - r && y < b[3] + r)) continue;
+      boxes.push([x - r - 6, y - r - 6, x + r + 6, y + r + 6]); n++;
+      el('circle', {cx:x + 4, cy:y + 5, r, fill:'rgba(0,0,0,.2)'}, svg);
+      el('circle', {cx:x, cy:y, r, fill:rnd() < .5 ? '#3f8a3a' : '#4f9b42'}, svg);
+      el('circle', {cx:x - r * .3, cy:y - r * .3, r:r * .45, fill:'rgba(255,255,255,.14)'}, svg);
+    }
+
+    rival = {g: makeCar('#2f6fd6', '#1c4d9e', svg), s: len * .45, v: 300, lane: LANE};
+    me = me ? {...me, g: makeCar('#e8491d', '#9e2d0c', svg)} : {g: makeCar('#e8491d', '#9e2d0c', svg), s: 0, v: 0, lane: -LANE};
+    if (here) me.s = stops[here];
+    person = el('g', {class:'person', opacity:0}, svg);
+    el('ellipse', {cx:0, cy:0, rx:6, ry:10, fill:'#2d6cdf'}, person);
+    el('circle', {cx:0, cy:0, r:5.5, fill:'#f1c27d'}, person);
+    el('path', {d:'M-5.5 0 A5.5 5.5 0 0 1 5.5 0 Z', fill:'#4a2f1d', transform:'rotate(-90)'}, person);
+    if (target) bld[target].g.classList.add('target');
+    // a resize mid-walk: skip the rest of the walk rather than leave someone stranded
+    if (walk){ walk = null; if (state === 'walkOut') openRoom(here); else { state = 'idle'; flush(); } }
+    if (here && room.open) bld[here].doorEl.classList.add('open');
+  }
+
+  // ----- what happens when a place is chosen -----
+  function go(id){
+    if (!stops[id]) return;
+    if (state === 'walkOut' || state === 'inside') return;
+    if (state === 'walkBack'){ pending = id; return; }
+    if (reduce){ me.s = stops[id]; here = id; openRoom(id); return; }
+    Object.values(bld).forEach(b => b.g.classList.remove('target'));
+    if (here === id && state === 'idle'){ arrive(id); return; }
+    target = id; here = null; state = 'driving';
+    bld[id].g.classList.add('target');
+  }
+  function arrive(id){
+    here = id; target = null; state = 'walkOut';
+    bld[id].g.classList.remove('target');
+    const c = pose(me.s, me.lane);
+    walk = {from:{x:c.x, y:c.y}, to:bld[id].door, t:0};
+    walk.dur = Math.hypot(walk.to.x - walk.from.x, walk.to.y - walk.from.y) / WALK;
+  }
+  function openRoom(id){
+    state = 'inside';
+    bld[id].doorEl.classList.add('open');
+    roomBody.replaceChildren(document.getElementById(id));
+    room.showModal();
+    roomBody.scrollTop = 0;
+    history.replaceState(null, '', '#' + id);
+  }
+  room.addEventListener('close', () => {
+    const sec = roomBody.firstElementChild;
+    if (sec) holder.appendChild(sec);
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!here) { state = 'idle'; return; }
+    bld[here].doorEl.classList.remove('open');
+    if (reduce){ state = 'idle'; flush(); return; }
+    const c = pose(me.s, me.lane);
+    state = 'walkBack';
+    walk = {from:bld[here].door, to:{x:c.x, y:c.y}, t:0};
+    walk.dur = Math.hypot(walk.to.x - walk.from.x, walk.to.y - walk.from.y) / WALK;
   });
-  go(0);
-}
-function go(i, user){
-  idx = (i + CARS.length) % CARS.length;
-  slidesEl.style.transform = `translateX(-${idx * 100}%)`;
-  [...dotsEl.children].forEach((d, j) => d.classList.toggle('on', j === idx));
-  const c = CARS[idx];
-  document.getElementById('carTag').textContent = c.tag;
-  document.getElementById('heroTitle').textContent = c.title;
-  document.getElementById('heroText').textContent = c.text;
-  if (user) restart();
-}
-function restart(){ clearInterval(timer); timer = setInterval(() => go(idx + 1), 5500); }
-document.querySelector('.prev').onclick = () => go(idx - 1, true);
-document.querySelector('.next').onclick = () => go(idx + 1, true);
-document.querySelector('.shuffle').onclick = () => { seed = Math.floor(Math.random() * 10000); buildSlides(); restart(); };
-const hero = document.querySelector('.hero');
-hero.addEventListener('mouseenter', () => clearInterval(timer));
-hero.addEventListener('mouseleave', restart);
-let tx = null;
-hero.addEventListener('touchstart', e => tx = e.touches[0].clientX, {passive:true});
-hero.addEventListener('touchend', e => {
-  if (tx === null) return;
-  const dx = e.changedTouches[0].clientX - tx;
-  if (Math.abs(dx) > 40) go(idx + (dx < 0 ? 1 : -1), true);
-  tx = null;
-});
-document.addEventListener('keydown', e => {
-  if (e.target.closest('input,textarea,select')) return;
-  if (e.key === 'ArrowLeft') go(idx - 1, true);
-  if (e.key === 'ArrowRight') go(idx + 1, true);
-});
-buildSlides(); restart();
+  room.querySelector('.room-x').onclick = () => room.close();
+  room.addEventListener('click', e => { if (e.target === room) room.close(); });
+  function flush(){ if (pending){ const p = pending; pending = null; go(p); } }
+
+  // every in-page link to a place goes by car (closing the current room first)
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#"]'); if (!a) return;
+    const id = a.getAttribute('href').slice(1);
+    if (!stops[id]) return;
+    e.preventDefault();
+    if (room.open){ pending = id; room.close(); } else go(id);
+  });
+
+  // ----- animation -----
+  function place(car, s, speed){
+    const p = pose(s, car.lane);
+    const drift = turn(s, 26) * clamp(speed / VMAX, 0, 1) * .7;   // slot cars hang the tail out in corners
+    car.g.setAttribute('transform', `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)}) rotate(${((p.a + drift) * 180 / Math.PI).toFixed(2)})`);
+  }
+  let last = performance.now();
+  function frame(now){
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    // rival just laps, braking for the bends
+    const want = 430 - Math.min(1, Math.abs(turn(rival.s, 60)) / 1.2) * 190;
+    rival.v += clamp(want - rival.v, -A * dt, A * .6 * dt);
+    rival.s = (rival.s + rival.v * dt) % len;
+    place(rival, rival.s, rival.v);
+    rival.g.classList.toggle('lit', true);
+
+    let braking = false;
+    if (state === 'driving'){
+      const rem = ((stops[target] - me.s) % len + len) % len;
+      const nv = Math.max(30, Math.min(VMAX, me.v + A * dt, Math.sqrt(2 * A * rem)));
+      braking = nv < me.v - 1;
+      me.v = nv;
+      const step = me.v * dt;
+      if (step >= rem){ me.s = stops[target]; me.v = 0; arrive(target); }
+      else me.s = (me.s + step) % len;
+    }
+    place(me, me.s, me.v);
+    me.g.classList.toggle('lit', state === 'driving');
+    me.g.classList.toggle('braking', braking);
+
+    if (walk){
+      walk.t = Math.min(1, walk.t + dt / Math.max(walk.dur, .2));
+      const k = walk.t, x = walk.from.x + (walk.to.x - walk.from.x) * k, y = walk.from.y + (walk.to.y - walk.from.y) * k;
+      const a = Math.atan2(walk.to.y - walk.from.y, walk.to.x - walk.from.x) * 180 / Math.PI;
+      const bob = 1.4 + Math.sin(k * walk.dur * 18) * .1;
+      person.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a.toFixed(1)}) scale(${bob.toFixed(3)})`);
+      person.setAttribute('opacity', clamp(Math.min(k, 1 - k) * 8, 0, 1));
+      if (k === 1){
+        walk = null; person.setAttribute('opacity', 0);
+        if (state === 'walkOut') openRoom(here);
+        else { state = 'idle'; flush(); }
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  const pick = () => svg.parentElement.clientWidth < 640 ? 'tall' : 'wide';
+  build(pick());
+  addEventListener('resize', () => { if (pick() !== layoutKey) build(pick()); });
+  requestAnimationFrame(frame);
+  const start = location.hash.slice(1);
+  if (stops[start]) setTimeout(() => go(start), 500);
+})();
 
 // ---------- mobile menu ----------
 const menuBtn = document.querySelector('.menu-btn'), navList = document.querySelector('nav ul');
@@ -597,115 +755,6 @@ document.getElementById('again').onclick = e => {
   document.getElementById('sent').classList.remove('show');
 };
 
-// ---------- the road: a car drives to whatever section you click, the page follows it ----------
-(() => {
-  const road = document.getElementById('road'), car = document.getElementById('car');
-  const header = document.querySelector('header.nav');
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const STOP = 70;                                   // car parks this far into a section
-  const LABEL = {top:'Start', services:'Services', about:'About', pricing:'Pricing', process:'How it works', reviews:'Reviews', faq:'FAQ', contact:'Contact'};
-  const hdr = () => header.offsetHeight;
-  const docTop = el => el.getBoundingClientRect().top + scrollY;
-  const stops = [...document.querySelectorAll('section[id]')].map(sec => {
-    const id = sec.id, name = LABEL[id] || id;
-    const sign = document.createElement('div');
-    sign.className = 'sign'; sign.textContent = name; sign.title = 'Drive to ' + name;
-    sign.onclick = () => driveTo(id);
-    const line = document.createElement('div'); line.className = 'stopline';
-    const paint = document.createElement('div'); paint.className = 'paint'; paint.textContent = name;
-    road.append(sign, line, paint);
-    const s = {id, sec, sign, line, paint, y:0};
-    s.park = () => id === 'top' ? hdr() + STOP + 60 : s.y + STOP;
-    return s;
-  });
-  function layout(){
-    stops.forEach(s => {
-      s.y = docTop(s.sec);
-      s.sign.style.top = (s.id === 'top' ? hdr() + 10 : s.y + 8) + 'px';
-      s.line.style.top = (s.park() + car.offsetHeight / 2 + 6) + 'px';
-      s.paint.style.top = (s.park() + car.offsetHeight / 2 + 30) + 'px';
-    });
-  }
-  new ResizeObserver(layout).observe(document.body);
-  addEventListener('load', layout);
-  layout();
-
-  const W = () => road.offsetWidth, maxScroll = () => document.documentElement.scrollHeight - innerHeight;
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  let carY = scrollY + stops[0].park(), carX = W() * .75, ang = 180, dir = 1;
-  let offset = carY - scrollY, drive = null, last = performance.now(), prevV = 0, lastPuff = 0;
-  const navLinks = [...document.querySelectorAll('nav a')];
-
-  function driveTo(id){
-    const s = stops.find(s => s.id === id); if (!s) return;
-    const to = s.park(), camTo = id === 'top' ? 0 : clamp(to - (hdr() + STOP), 0, maxScroll());
-    history.replaceState(null, '', id === 'top' ? location.pathname + location.search : '#' + id);
-    if (reduce){ carY = to; scrollTo(0, camTo); offset = carY - camTo; return; }
-    const dist = Math.abs(to - carY);
-    drive = {s, from:carY, to, camTo, cam:scrollY, off:to - camTo, t0:performance.now(), dur:clamp(500 + dist * .45, 700, 2600)};
-  }
-  // every in-page link goes by road
-  document.addEventListener('click', e => {
-    const a = e.target.closest('a[href^="#"]'); if (!a) return;
-    const id = a.getAttribute('href').slice(1);
-    if (stops.some(s => s.id === id)){ e.preventDefault(); driveTo(id); }
-  });
-  // the user taking the wheel (scrolling themselves) cancels a drive
-  const cancel = () => { if (drive){ drive = null; offset = clamp(carY - scrollY, 90, innerHeight - 60); } };
-  ['wheel','touchstart'].forEach(ev => addEventListener(ev, cancel, {passive:true}));
-  addEventListener('keydown', e => { if (/Arrow|Page|Home|End|Space/.test(e.code) && !e.target.closest('input,textarea,select')) cancel(); });
-
-  const ease = k => k < .5 ? 4*k*k*k : 1 - Math.pow(-2*k + 2, 3) / 2;
-  function puff(){
-    const p = document.createElement('div'); p.className = 'puff';
-    p.style.left = carX + 'px'; p.style.top = (carY - dir * car.offsetHeight * .55) + 'px';
-    road.appendChild(p); setTimeout(() => p.remove(), 700);
-  }
-  function frame(now){
-    const dt = Math.min(.05, (now - last) / 1000); last = now;
-    const y0 = carY;
-    if (drive){
-      const k = Math.min(1, (now - drive.t0) / drive.dur);
-      carY = drive.from + (drive.to - drive.from) * ease(k);
-      // the camera trails the car, but never lets it leave the screen
-      let cam = drive.cam + (carY - drive.off - drive.cam) * (1 - Math.exp(-dt * 5));
-      cam = clamp(cam, carY - innerHeight + 90, carY - 90);
-      if (k === 1) cam += (drive.camTo - cam) * (1 - Math.exp(-dt * 8));
-      drive.cam = clamp(cam, 0, maxScroll());
-      scrollTo(0, drive.cam);
-      if (k === 1 && Math.abs(drive.cam - drive.camTo) < 1){
-        scrollTo(0, drive.camTo);
-        offset = carY - drive.camTo;
-        const sign = drive.s.sign;
-        sign.classList.remove('hit'); void sign.offsetWidth; sign.classList.add('hit');
-        drive = null;
-      }
-    } else {
-      // free scrolling: the car cruises along, holding its spot on screen
-      const target = clamp(scrollY + offset, hdr() + 40, document.body.scrollHeight - 50);
-      carY += (target - carY) * (1 - Math.exp(-dt * 9));
-    }
-    const v = (carY - y0) / Math.max(dt, 1e-3), speed = Math.abs(v);
-    if (speed > 25) dir = Math.sign(v);
-    // keep left: heading down the page, the car's left is the screen's right
-    const lane = W() * (dir > 0 ? .75 : .25);
-    carX += (lane - carX) * (1 - Math.exp(-dt * 6));
-    ang += ((dir > 0 ? 180 : 0) - ang) * (1 - Math.exp(-dt * 8));
-    const steer = clamp((lane - carX) * .6, -25, 25) * (dir > 0 ? -1 : 1);
-    car.style.transform = `translate(${carX}px,${carY}px) rotate(${ang + steer}deg)`;
-    car.classList.toggle('lit', speed > 60);
-    car.classList.toggle('braking', speed + 40 < Math.abs(prevV) || !!(drive && now - drive.t0 > drive.dur * .6));
-    if (drive && speed > 200 && now - lastPuff > 70 && now - drive.t0 < drive.dur * .5){ puff(); lastPuff = now; }
-    prevV = v;
-    // light up the nav link for the section the car is in
-    let here = stops[0];
-    stops.forEach(s => { if (carY >= s.y - 10) here = s; });
-    navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + here.id));
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-  if (location.hash) setTimeout(() => driveTo(location.hash.slice(1)), 400);
-})();
 
 document.getElementById('yr').textContent = new Date().getFullYear();
 </script>
