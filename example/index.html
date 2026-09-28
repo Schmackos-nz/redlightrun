@@ -66,6 +66,23 @@ nav a:hover,nav a.active{color:var(--ink)}
 .car.braking .tail{fill:#ff2b2b;filter:drop-shadow(0 0 3px #ff2b2b)}
 .person{pointer-events:none}
 .snd{position:absolute;top:10px;right:10px;z-index:2;width:36px;height:36px;border-radius:4px;border:1px solid var(--line);background:rgba(11,12,14,.8);color:var(--muted);cursor:pointer;display:grid;place-items:center}
+.drive-hint{position:absolute;left:10px;top:10px;z-index:2;background:rgba(11,12,14,.82);border:1px solid var(--line);border-radius:4px;padding:7px 11px;font-size:.66rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);pointer-events:none;max-width:calc(100% - 70px)}
+.drive-hint:empty{display:none}
+.drive-hint b{color:var(--ink);font-weight:700}
+.drive-hint.go{color:var(--ink);border-color:var(--brand)}
+.drive-hint.go b{color:var(--brand)}
+.pad{display:none}
+@media (pointer:coarse){
+  .drive-hint{top:auto;bottom:10px;max-width:calc(100% - 190px);font-size:.6rem;line-height:1.5}
+  .pad{display:grid;position:absolute;right:10px;bottom:10px;z-index:2;grid-template-columns:repeat(3,46px);grid-template-rows:46px 46px;gap:6px}
+  .pad button{border:1px solid var(--line);border-radius:6px;background:rgba(11,12,14,.78);color:var(--ink);font-size:.9rem;touch-action:none;user-select:none;-webkit-user-select:none}
+  .pad button:active{border-color:var(--brand);background:rgba(232,86,31,.25)}
+  .pad [data-k=e]{grid-area:1/1;color:var(--brand);font-weight:700}
+  .pad [data-k=up]{grid-area:1/2}
+  .pad [data-k=left]{grid-area:2/1}
+  .pad [data-k=down]{grid-area:2/2}
+  .pad [data-k=right]{grid-area:2/3}
+}
 .snd:hover,.snd:focus-visible{color:var(--ink);border-color:var(--brand);outline:none}
 .snd svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
@@ -242,6 +259,14 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     </div>
     <div class="town-wrap">
       <button class="snd" type="button" aria-label="Mute sound"></button>
+      <div class="drive-hint" aria-live="polite"></div>
+      <div class="pad" aria-label="Driving controls">
+        <button type="button" data-k="e" aria-label="Get out">E</button>
+        <button type="button" data-k="up" aria-label="Accelerate">▲</button>
+        <button type="button" data-k="left" aria-label="Steer left">◀</button>
+        <button type="button" data-k="down" aria-label="Brake or reverse">▼</button>
+        <button type="button" data-k="right" aria-label="Steer right">▶</button>
+      </div>
       <svg id="town" role="group" aria-label="Workshop yard. Choose a bay to visit."></svg>
       <div id="room" class="room" role="region" aria-live="polite" hidden>
         <div class="room-bar"><span class="room-bay"></span><span class="room-title"></span><button class="room-x" aria-label="Close">✕</button></div>
@@ -476,7 +501,7 @@ const sel = document.getElementById('service');
   })();
 
   let layoutKey, L, path, len, stops = {}, bld = {};
-  let me, person, state = 'idle', target = null, here = null, pending = null, walk = null;
+  let obs = [], me, person, state = 'idle', target = null, here = null, pending = null, walk = null;
 
   // position on the centre line + sideways offset
   function pose(s, lane){
@@ -574,6 +599,7 @@ const sel = document.getElementById('service');
     // bays, each with a stop on the track nearest its roller door
     stops = {}; bld = {};
     const boxes = [];
+    obs = [];                                     // solid rects the car bumps into when driven by hand
     PLACES.forEach(pl => {
       const [cx, cy] = L.at[pl.id], bw = L.bw, bh = L.bh, x0 = cx - bw / 2, y0 = cy - bh / 2;
       let best = 0, bd = Infinity;
@@ -602,6 +628,7 @@ const sel = document.getElementById('service');
       g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); go(pl.id); } });
       bld[pl.id] = {g, door, doorEl};
       boxes.push([x0 - 20, y0 - 20, x0 + bw + 20, y0 + bh + 20]);
+      obs.push([x0, y0, x0 + bw, y0 + bh]);
     });
 
     // yard clutter in the spare space: containers, tyre stacks, pallets, oil
@@ -616,18 +643,22 @@ const sel = document.getElementById('service');
       if (!free(x, y, r)) continue;
       boxes.push([x - r, y - r, x + r, y + r]); n++;
       if (kind < .35){
-        const g = el('g', {transform:`translate(${x.toFixed(0)} ${y.toFixed(0)}) rotate(${rnd() < .5 ? 0 : 90})`}, svg);
+        const rot = rnd() < .5 ? 0 : 90;
+        const g = el('g', {transform:`translate(${x.toFixed(0)} ${y.toFixed(0)}) rotate(${rot})`}, svg);
+        obs.push(rot ? [x - 13, y - 34, x + 13, y + 32] : [x - 34, y - 13, x + 32, y + 13]);
         el('rect', {x:-30, y:-10, width:66, height:26, fill:'rgba(0,0,0,.5)'}, g);
         el('rect', {x:-34, y:-13, width:66, height:26, fill:RUST[i % RUST.length], stroke:'rgba(0,0,0,.5)'}, g);
         let ribs = '';
         for (let k = -30; k < 30; k += 5) ribs += `M${k} -13V13`;
         el('path', {d:ribs, stroke:'rgba(0,0,0,.25)', 'stroke-width':1}, g);
       } else if (kind < .6){
+        obs.push([x - 9, y - 9, x + 18, y + 20]);
         [[0, 0], [9, 5], [2, 11]].slice(0, 2 + (rnd() < .5)).forEach(([ox, oy]) => {
           el('circle', {cx:x + ox, cy:y + oy, r:8, fill:'#0d0d0d', stroke:'#262626', 'stroke-width':3}, svg);
           el('circle', {cx:x + ox, cy:y + oy, r:2.5, fill:'#050505'}, svg);
         });
       } else if (kind < .8){
+        obs.push([x - 13, y - 13, x + 13, y + 13]);
         const g = el('g', {transform:`translate(${x.toFixed(0)} ${y.toFixed(0)}) rotate(${(rnd() * 30 - 15).toFixed(0)})`}, svg);
         el('rect', {x:-11, y:-11, width:22, height:22, fill:'#51473a', stroke:'#2a241d'}, g);
         el('path', {d:'M-11 -4H11M-11 4H11', stroke:'#2a241d'}, g);
@@ -643,6 +674,8 @@ const sel = document.getElementById('service');
     });
 
     me = me ? {...me, g: makeCar('me', '#d4561f', '#5e1f0d', svg)} : {g: makeCar('me', '#d4561f', '#5e1f0d', svg), s: 0, v: 0, dir: 1, lane: -LANE, ang: null};
+    // free-driven positions don't survive a layout swap, so snap back onto the road
+    me.free = false; me.blend = null;
     if (here) me.s = stops[here];
     person = el('g', {class:'person', opacity:0}, svg);
     el('ellipse', {cx:0, cy:0, rx:4.5, ry:7.5, fill:'#23262b'}, person);
@@ -662,21 +695,64 @@ const sel = document.getElementById('service');
     if (state === 'walkOut' || state === 'inside') return;
     if (state === 'walkBack'){ pending = id; return; }
     Object.values(bld).forEach(b => b.g.classList.remove('target'));
-    if (here === id && state === 'idle'){ arrive(id); return; }
+    if (here === id && state === 'idle' && !me.free){ arrive(id); return; }
     sfx.init();
+    if (me.free) mergeToRoad();
     if (me.v < 1){
       const fwd = ((stops[id] - me.s) % len + len) % len;
       me.dir = fwd <= len - fwd ? 1 : -1;     // it's a two-way road: take the short way
+    }
+    if (me.blend && me.blend.fresh){
+      // glide from wherever it was parked onto the correct side of the road
+      me.lane = me.dir > 0 ? -LANE : LANE;
+      const p = pose(me.s, me.lane);
+      me.blend = {x: me.blend.x - p.x, y: me.blend.y - p.y};
     }
     if (state !== 'driving') sfx.start();
     target = id; here = null; state = 'driving';
     bld[id].g.classList.add('target');
   }
+  function carPos(){
+    if (me.free) return {x: me.x, y: me.y};
+    const p = pose(me.s, me.lane);
+    return me.blend && !me.blend.fresh ? {x: p.x + me.blend.x, y: p.y + me.blend.y} : p;
+  }
+  function mergeToRoad(){
+    let best = 0, bd = Infinity;
+    for (let s = 0; s < len; s += 4){ const p = path.getPointAtLength(s), d = (p.x - me.x) ** 2 + (p.y - me.y) ** 2; if (d < bd){ bd = d; best = s; } }
+    me.s = best; me.v = 0; me.free = false; here = null;
+    me.blend = {x: me.x, y: me.y, fresh: true};   // resolved to an offset once go() knows the lane
+  }
+  const nearestBay = () => {
+    const c = carPos();
+    let best = null, bd = Infinity;
+    for (const id in bld){ const d = Math.hypot(bld[id].door.x - c.x, bld[id].door.y - c.y); if (d < bd){ bd = d; best = id; } }
+    return best;
+  };
+  // E: stop, get out, walk into whichever bay is closest
+  function getOut(){
+    if (state !== 'idle' || Math.abs(me.v) > 60) return;
+    Object.values(bld).forEach(b => b.g.classList.remove('target'));
+    me.v = 0;
+    arrive(nearestBay());
+  }
+  // any drive key hands you the wheel, even mid auto-drive
+  function takeWheel(){
+    if (state !== 'idle' && state !== 'driving') return;
+    sfx.init();
+    if (!engineOn) sfx.start();
+    if (!me.free){
+      const c = carPos();
+      me.x = c.x; me.y = c.y; me.free = true; me.blend = null;
+      if (me.ang == null) me.ang = pose(me.s, 0).a;
+    }
+    if (state === 'driving'){ Object.values(bld).forEach(b => b.g.classList.remove('target')); target = null; state = 'idle'; }
+  }
   function arrive(id){
     here = id; target = null; state = 'walkOut';
     bld[id].g.classList.remove('target');
     sfx.door();
-    const c = pose(me.s, me.lane);
+    const c = carPos();
     walk = {from:{x:c.x, y:c.y}, to:bld[id].door, t:0, steps:0};
     walk.dur = Math.hypot(walk.to.x - walk.from.x, walk.to.y - walk.from.y) / WALK;
   }
@@ -705,7 +781,7 @@ const sel = document.getElementById('service');
     bld[here].doorEl.classList.remove('open');
     sfx.roller();
     bld[here].g.focus({preventScroll:true});
-    const c = pose(me.s, me.lane);
+    const c = carPos();
     state = 'walkBack';
     walk = {from:bld[here].door, to:{x:c.x, y:c.y}, t:0, steps:0};
     walk.dur = Math.hypot(walk.to.x - walk.from.x, walk.to.y - walk.from.y) / WALK;
@@ -783,6 +859,7 @@ const sel = document.getElementById('service');
       start(){ noise(.35, 'lowpass', 300, 1, .25, .02); thump(55, .3, .3); },
       door(){ noise(.12, 'lowpass', 500, 1, .5); thump(90, .15, .5); },
       step(){ noise(.05, 'bandpass', 1000 + Math.random() * 400, 2, .14, .003); },
+      bump(){ thump(60, .18, .5); noise(.15, 'lowpass', 800, 1, .35); },
       screech(){ noise(.45, 'bandpass', 2400, 6, .07, .03); },
       roller(){ for (let i = 0; i < 14; i++) noise(.04, 'bandpass', 700 + i * 25, 3, .1, .003, i * .035); thump(70, .2, .25, .5); },
     };
@@ -795,9 +872,76 @@ const sel = document.getElementById('service');
   sndBtn.onclick = () => { sfx.toggle(); drawSnd(); };
   drawSnd();
 
+  // ----- driving it yourself -----
+  const keys = {up:false, down:false, left:false, right:false};
+  const KEYMAP = {KeyW:'up', ArrowUp:'up', KeyS:'down', ArrowDown:'down', KeyA:'left', ArrowLeft:'left', KeyD:'right', ArrowRight:'right'};
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  let engineOn = false;
+  const yardOnScreen = () => { const r = wrap.getBoundingClientRect(); return r.bottom > 80 && r.top < innerHeight - 80; };
+  addEventListener('keydown', e => {
+    if (e.target.closest?.('input,textarea,select,[contenteditable]') || isOpen() || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = KEYMAP[e.code];
+    if (k && yardOnScreen()){ e.preventDefault(); keys[k] = true; takeWheel(); }
+    else if (e.code === 'KeyE' && yardOnScreen()){ e.preventDefault(); getOut(); }
+  });
+  addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) keys[k] = false; });
+  addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+  wrap.querySelectorAll('.pad button').forEach(b => {
+    const k = b.dataset.k;
+    b.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      b.setPointerCapture?.(e.pointerId);
+      if (k === 'e'){ sfx.init(); getOut(); } else { keys[k] = true; takeWheel(); }
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => b.addEventListener(ev, () => { if (k !== 'e') keys[k] = false; }));
+  });
+  const hintEl = wrap.querySelector('.drive-hint');
+  let hintHTML = null;
+  function drive(dt){
+    const canDrive = state === 'idle';
+    const thr = canDrive ? keys.up - keys.down : 0, steer = canDrive ? keys.right - keys.left : 0;
+    if (thr > 0) me.v += (me.v < 0 ? 1400 : 650) * dt;
+    else if (thr < 0) me.v -= (me.v > 0 ? 1400 : 420) * dt;
+    else me.v -= Math.sign(me.v) * Math.min(Math.abs(me.v), 260 * dt);
+    me.v = clamp(me.v, -200, 560);
+    const braking = (thr < 0 && me.v > 0) || (thr > 0 && me.v < 0);
+    if (braking && me.v > 380 && !me.screeched){ sfx.screech(); me.screeched = true; }
+    if (!braking) me.screeched = false;
+    me.ang += steer * 2.9 * clamp(me.v / 180, -1, 1) * dt;
+    me.x += Math.cos(me.ang) * me.v * dt;
+    me.y += Math.sin(me.ang) * me.v * dt;
+    // yard edges, bays and clutter are solid
+    const R = 13;
+    const bump = () => { if (Math.abs(me.v) > 90) sfx.bump(); me.v *= -.25; };
+    if (me.x < R || me.x > L.w - R || me.y < R || me.y > L.h - R){ me.x = clamp(me.x, R, L.w - R); me.y = clamp(me.y, R, L.h - R); bump(); }
+    for (const [a, b, c, d] of obs){
+      if (me.x <= a - R || me.x >= c + R || me.y <= b - R || me.y >= d + R) continue;
+      const push = [me.x - (a - R), c + R - me.x, me.y - (b - R), d + R - me.y], m = Math.min(...push);
+      if (m === push[0]) me.x = a - R; else if (m === push[1]) me.x = c + R; else if (m === push[2]) me.y = b - R; else me.y = d + R;
+      bump();
+    }
+    me.g.setAttribute('transform', `translate(${me.x.toFixed(2)} ${me.y.toFixed(2)}) rotate(${(me.ang * 180 / Math.PI).toFixed(2)})`);
+    return braking;
+  }
+  function updateHint(){
+    let h = '', go = false;
+    if (state === 'idle' && me.free && Math.abs(me.v) < 60){
+      const pl = PLACES.find(p => p.id === nearestBay());
+      h = `<b>E</b> Walk into ${pl.bay} · ${pl.name}`; go = true;
+    } else if (state === 'idle' || state === 'driving')
+      h = coarse ? 'Pad to drive · <b>E</b> get out' : '<b>WASD</b> / <b>Arrows</b> drive · <b>E</b> get out';
+    if (h !== hintHTML){ hintHTML = h; hintEl.innerHTML = h; hintEl.classList.toggle('go', go); }
+  }
+
   // ----- animation -----
   function place(car, dt){
     const p = pose(car.s, car.lane);
+    if (car.blend){
+      p.x += car.blend.x; p.y += car.blend.y;
+      const k = Math.exp(-dt * 2.5);
+      car.blend.x *= k; car.blend.y *= k;
+      if (Math.abs(car.blend.x) + Math.abs(car.blend.y) < .3) car.blend = null;
+    }
     const drift = turn(car.s, 26 * car.dir) * clamp(car.v / VMAX, 0, 1) * .35;
     const want = p.a + (car.dir < 0 ? Math.PI : 0) + drift;
     if (car.ang == null) car.ang = want;
@@ -824,12 +968,18 @@ const sel = document.getElementById('service');
       if (step >= rem){ me.s = t; me.v = 0; arrive(target); }
       else me.s = ((me.s + me.dir * step) % len + len) % len;
     }
-    // keep left: which side of the centre line depends on the direction of travel
-    me.lane += ((me.dir > 0 ? -LANE : LANE) - me.lane) * (1 - Math.exp(-dt * 5));
-    place(me, dt);
-    me.g.classList.toggle('lit', state === 'driving');
+    if (me.free) braking = drive(dt);
+    else {
+      // keep left: which side of the centre line depends on the direction of travel
+      me.lane += ((me.dir > 0 ? -LANE : LANE) - me.lane) * (1 - Math.exp(-dt * 5));
+      place(me, dt);
+    }
+    const manualRun = me.free && (Math.abs(me.v) > 5 || (state === 'idle' && (keys.up || keys.down)));
+    engineOn = state === 'driving' || manualRun;
+    me.g.classList.toggle('lit', engineOn);
     me.g.classList.toggle('braking', braking);
-    sfx.engine(state === 'driving', me.v);
+    sfx.engine(engineOn, me.free ? Math.abs(me.v) * 1.4 : me.v);
+    updateHint();
 
     if (walk){
       walk.t = Math.min(1, walk.t + dt / Math.max(walk.dur, .2));
