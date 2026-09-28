@@ -84,9 +84,9 @@ nav a:hover,nav a.active{color:var(--ink)}
 .car .ind{fill:transparent}
 .car.hazard .ind,.van .bar{animation:haz .7s steps(1) infinite}
 @keyframes haz{50%{fill:#ffae00}}
-.garage-glow{fill:#3b3e44;transition:fill .3s}
-.garage.fixing .garage-glow{fill:#4caf6a;filter:drop-shadow(0 0 6px #4caf6a)}
-.g-label{font:700 11px Inter,sans-serif;fill:rgba(232,86,31,.85);letter-spacing:.24em;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.pickup{pointer-events:none}
+.pickup .halo{transform-box:fill-box;transform-origin:center;animation:halo 1.2s ease-in-out infinite}
+@keyframes halo{50%{transform:scale(1.3);opacity:.35}}
 .pad{display:none}
 @media (pointer:coarse){
   .hp{top:10px}
@@ -494,14 +494,13 @@ const sel = document.getElementById('service');
   const LAYOUTS = {
     wide: {w:1000, h:660, bw:150, bh:74,
       track:'M170 150 H830 A100 100 0 0 1 930 250 V430 A100 100 0 0 1 830 530 H620 C560 530 560 440 500 440 C440 440 440 530 380 530 H170 A100 100 0 0 1 70 430 V250 A100 100 0 0 1 170 150 Z',
-      at:{services:[320,62], about:[680,62], pricing:[790,320], process:[500,300], reviews:[210,320], faq:[260,606], contact:[740,606]},
-      garage:{x:190, y:410, w:120, h:62, open:'right'}},
+      at:{services:[320,62], about:[680,62], pricing:[790,320], process:[500,300], reviews:[210,320], faq:[260,606], contact:[740,606]}},
     tall: {w:600, h:1000, bw:140, bh:74,
       track:'M200 120 H400 A100 100 0 0 1 500 220 V780 A100 100 0 0 1 400 880 H200 A100 100 0 0 1 100 780 V220 A100 100 0 0 1 200 120 Z',
-      at:{services:[300,50], about:[385,300], pricing:[215,300], process:[385,500], reviews:[215,500], faq:[215,700], contact:[300,950]},
-      garage:{x:325, y:672, w:120, h:62, open:'top'}},
+      at:{services:[300,50], about:[385,300], pricing:[215,300], process:[385,500], reviews:[215,500], faq:[215,700], contact:[300,950]}},
   };
   const LANE = 18, A = 950, VMAX = 820, WALK = 95;
+  const TOP = 336;                                   // top speed driving yourself: 60% of the old 560
   const el = (tag, attrs = {}, parent) => {
     const e = document.createElementNS(NS, tag);
     for (const k in attrs) e.setAttribute(k, attrs[k]);
@@ -521,7 +520,7 @@ const sel = document.getElementById('service');
   })();
 
   let layoutKey, L, path, len, stops = {}, bld = {};
-  let obs = [], fx = [], fxLayer, garage, van = null, repair = null, toast = null, vanGuy, me, person, state = 'idle', target = null, here = null, pending = null, walk = null;
+  let obs = [], fx = [], fxLayer, pickups = [], nextPickup = 2, van = null, toast = null, vanGuy, me, person, state = 'idle', target = null, here = null, pending = null, walk = null;
 
   // position on the centre line + sideways offset
   function pose(s, lane){
@@ -660,27 +659,6 @@ const sel = document.getElementById('service');
       obs.push([x0, y0, x0 + bw, y0 + bh]);
     });
 
-    // Quick Fix garage: three walls, open on one side, drive in and stop to repair
-    {
-      const G = L.garage, t = 6, {x, y, w, h} = G;
-      const g = el('g', {class:'garage'}, svg);
-      el('rect', {x:x + 6, y:y + 8, width:w, height:h, fill:'rgba(0,0,0,.45)'}, g);
-      el('rect', {x, y, width:w, height:h, fill:'#26282c'}, g);
-      const walls = G.open === 'right' ? [[x, y, w, t], [x, y + h - t, w, t], [x, y, t, h]] : [[x, y, t, h], [x + w - t, y, t, h], [x, y + h - t, w, t]];
-      walls.forEach(([a, b, c, d]) => { el('rect', {x:a, y:b, width:c, height:d, fill:'#44474d', stroke:'#1a1b1e'}, g); obs.push([a, b, a + c, b + d]); });
-      // hazard striping across the open side, a light strip on the back wall
-      const stripe = G.open === 'right' ? {x:x + w - 6, y:y + t, width:6, height:h - 2 * t} : {x:x + t, y, width:w - 2 * t, height:6};
-      el('rect', {...stripe, fill:'#b8931f'}, g);
-      el('rect', {...stripe, fill:'url(#chk)', opacity:.35}, g);
-      const glow = G.open === 'right' ? {x:x + t + 2, y:y + 12, width:3, height:h - 24} : {x:x + 12, y:y + h - t - 5, width:w - 24, height:3};
-      el('rect', {...glow, class:'garage-glow'}, g);
-      const lx = G.open === 'right' ? x + w / 2 + 4 : x + w / 2, ly = G.open === 'right' ? y + h / 2 : y + h / 2 - 4;
-      el('text', {x:lx, y:ly, class:'g-label'}, g).textContent = 'QUICK FIX';
-      garage = {g, inner: G.open === 'right' ? [x + t, y + t, x + w, y + h - t] : [x + t, y, x + w - t, y + h - t]};
-      boxes.push([x - 30, y - 30, x + w + 30, y + h + 30]);
-      boxes.push(G.open === 'right' ? [x + w, y - 10, x + w + 90, y + h + 10] : [x - 10, y - 90, x + w + 10, y]);
-    }
-
     // yard clutter in the spare space: containers, tyre stacks, pallets, oil
     const samples = [];
     for (let s = 0; s < len; s += 12) samples.push(path.getPointAtLength(s));
@@ -739,8 +717,10 @@ const sel = document.getElementById('service');
     vanGuy = makePerson('#d8c21a', '#2a2a2a');
     fxLayer = el('g', {'pointer-events':'none'}, svg);
     fx = [];
-    // a layout swap mid-job: skip to the end rather than strand the ute or the repair
-    if (van || repair || me.broken){ van = null; repair = null; me.broken = false; me.hp = 100; }
+    // a layout swap mid-job: skip to the end rather than strand the ute
+    if (van || me.broken){ van = null; me.broken = false; me.hp = 100; }
+    pickups = []; nextPickup = 2;
+    me.nitro = 0;
     me.hp = me.hp ?? 100;
 
     if (target) bld[target].g.classList.add('target');
@@ -753,7 +733,7 @@ const sel = document.getElementById('service');
   function go(id){
     if (!stops[id]) return;
     if (state === 'walkOut' || state === 'inside') return;
-    if (me.broken || repair){ pending = id; return; }
+    if (me.broken){ pending = id; return; }
     if (state === 'walkBack'){ pending = id; return; }
     Object.values(bld).forEach(b => b.g.classList.remove('target'));
     if (here === id && state === 'idle' && !me.free){ arrive(id); return; }
@@ -932,6 +912,15 @@ const sel = document.getElementById('service');
       breakdown(){ for (let i = 0; i < 6; i++) thump(52 - i * 5, .12, .4 - i * .05, i * .2); noise(1.4, 'bandpass', 4200, 1, .09, .25, 1.1); },
       ratchet(){ for (let i = 0; i < 4; i++) noise(.025, 'highpass', 2600, 1, .16, .002, i * .055); },
       ding(){ tone(1320, .7, .16); tone(1980, .6, .07, .06); },
+      nitro(){
+        if (!ctx) return;
+        const t = ctx.currentTime, src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+        src.buffer = noiseBuf; f.type = 'bandpass'; f.Q.value = 2;
+        f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(3200, t + .5);
+        g.gain.setValueAtTime(.001, t); g.gain.exponentialRampToValueAtTime(.35, t + .08); g.gain.exponentialRampToValueAtTime(.001, t + .9);
+        src.connect(f).connect(g).connect(out); src.start(t); src.stop(t + 1);
+        tone(520, .25, .08); tone(780, .3, .06, .08);
+      },
       beep(){ tone(760, .13, .12); tone(760, .13, .12, .22); },
       screech(){ noise(.45, 'bandpass', 2400, 6, .07, .03); },
       roller(){ for (let i = 0; i < 14; i++) noise(.04, 'bandpass', 700 + i * 25, 3, .1, .003, i * .035); thump(70, .2, .25, .5); },
@@ -971,14 +960,17 @@ const sel = document.getElementById('service');
   const hintEl = wrap.querySelector('.drive-hint');
   let hintHTML = null;
   function drive(dt){
-    const canDrive = state === 'idle' && !me.broken && !repair;
+    const canDrive = state === 'idle' && !me.broken;
     const thr = canDrive ? keys.up - keys.down : 0, steer = canDrive ? keys.right - keys.left : 0;
-    if (thr > 0) me.v += (me.v < 0 ? 1400 : 650) * dt;
-    else if (thr < 0) me.v -= (me.v > 0 ? 1400 : 420) * dt;
+    const nos = me.nitro > 0, top = nos ? TOP * 1.4 : TOP, v0 = me.v;
+    if (thr > 0 && me.v < top) me.v += (me.v < 0 ? 1400 : nos ? 1000 : 520) * dt;
+    else if (thr < 0) me.v -= (me.v > 0 ? 1400 : 380) * dt;
     else me.v -= Math.sign(me.v) * Math.min(Math.abs(me.v), 260 * dt);
-    me.v = clamp(me.v, -200, 560);
+    // when the nitrous runs out, bleed the extra speed off rather than snapping back
+    if (me.v > top) me.v = v0 <= top ? top : Math.max(top, me.v - 500 * dt);
+    me.v = Math.max(me.v, -150);
     const braking = (thr < 0 && me.v > 0) || (thr > 0 && me.v < 0);
-    if (braking && me.v > 380 && !me.screeched){ sfx.screech(); me.screeched = true; }
+    if (braking && me.v > 250 && !me.screeched){ sfx.screech(); me.screeched = true; }
     if (!braking) me.screeched = false;
     me.ang += steer * 2.9 * clamp(me.v / 180, -1, 1) * dt;
     me.x += Math.cos(me.ang) * me.v * dt;
@@ -994,13 +986,6 @@ const sel = document.getElementById('service');
       hit = true;
     }
     if (hit) crash(Math.abs(me.v));
-    // rolled to a stop inside the Quick Fix garage: fix it
-    const gi = garage.inner;
-    if (!repair && !me.broken && me.hp < 100 && Math.abs(me.v) < 40 && me.x > gi[0] && me.x < gi[2] && me.y > gi[1] && me.y < gi[3]){
-      repair = {t:0, dur:1.6, from:me.hp, tick:0};
-      me.v = 0;
-      garage.g.classList.add('fixing');
-    }
     me.g.setAttribute('transform', `translate(${me.x.toFixed(2)} ${me.y.toFixed(2)}) rotate(${(me.ang * 180 / Math.PI).toFixed(2)})`);
     return braking;
   }
@@ -1023,9 +1008,8 @@ const sel = document.getElementById('service');
     setTimeout(() => { if (me.broken && !van) dispatchVan(); }, 1200);
   }
   function fixed(msg){
-    me.hp = 100; me.broken = false; repair = null;
+    me.hp = 100; me.broken = false;
     me.g.classList.remove('hazard');
-    garage.g.classList.remove('fixing');
     sfx.ding();
     toast = {html:msg, until:performance.now() + 3200};
     if (state === 'idle') flush();
@@ -1036,6 +1020,9 @@ const sel = document.getElementById('service');
     if (kind === 'spark'){
       const sp = 120 + Math.random() * 260;
       fx.push({e: el('line', {stroke:'#ffc266', 'stroke-width':1.6, 'stroke-linecap':'round'}, fxLayer), kind, x, y, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp, life:0, max:.25 + Math.random() * .25});
+    } else if (kind === 'flame'){
+      const sp = 40 + Math.random() * 60;
+      fx.push({e: el('circle', {fill: Math.random() < .5 ? '#7fdcff' : '#e9f6ff'}, fxLayer), kind, x, y, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp, life:0, max:.18 + Math.random() * .15, base:.9});
     } else {
       const dark = kind === 'black';
       fx.push({e: el('circle', {fill: dark ? '#1c1c1c' : '#9a9a9a'}, fxLayer), kind, x, y, vx:Math.cos(a) * 8 + 10, vy:Math.sin(a) * 8 - 14, life:0, max:1.1 + Math.random() * .8, base: dark ? .75 : .45});
@@ -1055,7 +1042,7 @@ const sel = document.getElementById('service');
         f.e.setAttribute('opacity', (1 - k).toFixed(2));
       } else {
         f.e.setAttribute('cx', f.x.toFixed(1)); f.e.setAttribute('cy', f.y.toFixed(1));
-        f.e.setAttribute('r', (3 + k * 11).toFixed(1));
+        f.e.setAttribute('r', (f.kind === 'flame' ? 4.5 - k * 3.5 : 3 + k * 11).toFixed(1));
         f.e.setAttribute('opacity', (f.base * (1 - k)).toFixed(2));
       }
     }
@@ -1172,6 +1159,65 @@ const sel = document.getElementById('service');
     V.g.setAttribute('transform', `translate(${V.x.toFixed(2)} ${V.y.toFixed(2)}) rotate(${((V.ang || 0) * 180 / Math.PI).toFixed(2)})`);
   }
 
+  // ----- pickups on the road: spanners repair, nitrous boosts -----
+  const SPANNER = '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>';
+  function spawnPickup(){
+    if (pickups.length >= 4) return;
+    const c = carPos();
+    for (let tries = 0; tries < 12; tries++){
+      const p = pose(Math.random() * len, (Math.random() < .5 ? -1 : 1) * LANE);
+      if (Math.hypot(p.x - c.x, p.y - c.y) < 150 || pickups.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 90)) continue;
+      // keep the mix even so a run of one kind can't starve the other
+      const ns = pickups.filter(q => q.kind === 'spanner').length, nn = pickups.length - ns;
+      const kind = ns < nn ? 'spanner' : nn < ns ? 'nitro' : Math.random() < .5 ? 'spanner' : 'nitro', col = kind === 'spanner' ? '#4caf6a' : '#3cc8ff';
+      const g = el('g', {class:'pickup', opacity:0});
+      svg.insertBefore(g, me.g);
+      el('circle', {r:15, fill:'none', stroke:col, 'stroke-width':1.5, class:'halo'}, g);
+      el('circle', {r:12, fill:'rgba(10,11,13,.85)', stroke:col, 'stroke-width':2}, g);
+      if (kind === 'spanner'){
+        const ico = el('g', {transform:'translate(-7.2 -7.2) scale(.6)', fill:'none', stroke:'#e7e5e0', 'stroke-width':2.6, 'stroke-linecap':'round', 'stroke-linejoin':'round'}, g);
+        ico.innerHTML = SPANNER;
+      } else {
+        el('rect', {x:-1.8, y:-9.5, width:3.6, height:3, fill:'#b9bdc4'}, g);
+        el('rect', {x:-4, y:-7, width:8, height:15, rx:3, fill:'#2f7fd6', stroke:'#0c2a4a'}, g);
+        el('rect', {x:-4, y:-1.5, width:8, height:3, fill:'#e7e5e0'}, g);
+      }
+      pickups.push({g, kind, x:p.x, y:p.y, age:0, life:25, spin:Math.random() * 6});
+      return;
+    }
+  }
+  function stepPickups(dt){
+    nextPickup -= dt;
+    if (nextPickup <= 0){ spawnPickup(); nextPickup = 3.5 + Math.random() * 3; }
+    const c = carPos();
+    for (let i = pickups.length - 1; i >= 0; i--){
+      const P = pickups[i];
+      P.age += dt;
+      const gone = P.age >= P.life, got = !gone && Math.hypot(P.x - c.x, P.y - c.y) < 24;
+      if (gone || got){
+        P.g.remove(); pickups.splice(i, 1);
+        if (got) collect(P);
+        continue;
+      }
+      // fade in, bob, and blink out over the last few seconds
+      const fade = Math.min(1, P.age * 3) * (P.life - P.age < 4 ? (Math.sin(P.age * 14) > 0 ? 1 : .35) : 1);
+      P.g.setAttribute('opacity', fade.toFixed(2));
+      P.g.setAttribute('transform', `translate(${P.x.toFixed(1)} ${P.y.toFixed(1)}) scale(${(1 + Math.sin(P.age * 4 + P.spin) * .08).toFixed(3)})`);
+    }
+  }
+  function collect(P){
+    for (let i = 0; i < 10; i++) particle(P.x, P.y, P.kind === 'spanner' ? 'spark' : 'flame');
+    if (P.kind === 'spanner'){
+      const before = me.hp;
+      me.hp = Math.min(100, me.hp + 30);
+      sfx.ratchet(); sfx.ding();
+      toast = {html: before >= 100 ? '<b>Spanner</b> Already good as new' : `<b>Spanner</b> +${Math.round(me.hp - before)}% repaired`, until:performance.now() + 2200};
+    } else {
+      me.nitro = Math.min(6, (me.nitro || 0) + 3.5);
+      sfx.nitro();
+    }
+  }
+
   const hpEl = wrap.querySelector('.hp'), hpBar = hpEl.querySelector('b'), hpNum = hpEl.querySelector('span');
   let hpShown = -1;
   function updateHp(){
@@ -1187,10 +1233,10 @@ const sel = document.getElementById('service');
   function updateHint(){
     let h = '', go = false;
     if (toast && performance.now() > toast.until) toast = null;
-    if (repair){ h = `<b>Quick Fix</b> Repairing… ${Math.round(me.hp)}%`; go = true; }
-    else if (me.broken && state === 'idle') { h = van && van.phase === 'fix' ? '<b>Roadside assist</b> Fixing your car…' : '<b>Broken down</b> Roadside assist is on the way'; go = true; }
+    if (me.broken && state === 'idle') { h = van && van.phase === 'fix' ? '<b>Roadside assist</b> Fixing your car…' : '<b>Broken down</b> Roadside assist is on the way'; go = true; }
     else if (toast && (state === 'idle' || state === 'driving')){ h = toast.html; go = true; }
-    else if (state === 'idle' && me.free && me.hp < 70 && Math.abs(me.v) < 60){ h = 'Banged up? Roll into <b>Quick Fix</b> · or <b>E</b> walk into a bay'; go = true; }
+    else if (me.nitro > 0 && state === 'idle'){ h = `<b>Nitrous</b> ${me.nitro.toFixed(1)}s`; go = true; }
+    else if (state === 'idle' && me.free && me.hp < 70 && Math.abs(me.v) < 60){ h = 'Banged up? Grab a <b>spanner</b> off the road · <b>E</b> walk into a bay'; go = true; }
     else if (state === 'idle' && me.free && Math.abs(me.v) < 60){
       const pl = PLACES.find(p => p.id === nearestBay());
       h = `<b>E</b> Walk into ${pl.bay} · ${pl.name}`; go = true;
@@ -1244,13 +1290,11 @@ const sel = document.getElementById('service');
     engineOn = state === 'driving' || manualRun;
     me.g.classList.toggle('lit', engineOn);
     me.g.classList.toggle('braking', braking);
-    sfx.engine(engineOn, me.free ? Math.abs(me.v) * 1.4 : me.v);
-    // garage repair, smoke from a damaged engine, the ute, particles
-    if (repair){
-      repair.t += dt;
-      me.hp = repair.from + (100 - repair.from) * Math.min(1, repair.t / repair.dur);
-      if (repair.t - repair.tick > .25){ repair.tick = repair.t; sfx.ratchet(); for (let i = 0; i < 3; i++) particle(me.x + Math.cos(me.ang) * 16, me.y + Math.sin(me.ang) * 16, 'spark'); }
-      if (repair.t >= repair.dur) fixed('<b>Quick Fix</b> Good as new in 1.6 s · no forms, no waiting');
+    sfx.engine(engineOn, me.free ? Math.abs(me.v) * 1.75 : me.v);
+    // nitrous burn, smoke from a damaged engine, pickups, the ute, particles
+    if (me.nitro > 0){
+      me.nitro = Math.max(0, me.nitro - dt);
+      if (me.free && me.v > 60) for (let i = 0; i < 2; i++) particle(me.x - Math.cos(me.ang) * 24, me.y - Math.sin(me.ang) * 24, 'flame');
     }
     const dmg = 1 - me.hp / 100;
     me.g.querySelector('.dmg').setAttribute('opacity', dmg.toFixed(2));
@@ -1258,6 +1302,7 @@ const sel = document.getElementById('service');
       const c = carPos(), a = me.free ? me.ang : me.ang ?? 0;
       particle(c.x + Math.cos(a) * 14, c.y + Math.sin(a) * 14, me.broken || me.hp < 25 ? 'black' : 'grey');
     }
+    stepPickups(dt);
     if (van) stepVan(dt);
     stepFx(dt);
     updateHint();
@@ -1282,7 +1327,7 @@ const sel = document.getElementById('service');
   }
 
   // ?dev exposes the yard's live state for poking at from devtools
-  if (/[?&]dev/.test(location.search)) window.__yard = {get me(){ return me; }, get van(){ return van; }, get repair(){ return repair; }, get garage(){ return garage; }, get state(){ return state; }};
+  if (/[?&]dev/.test(location.search)) window.__yard = {get me(){ return me; }, get van(){ return van; }, get pickups(){ return pickups; }, get state(){ return state; }};
   const pick = () => wrap.clientWidth < 640 ? 'tall' : 'wide';
   build(pick());
   addEventListener('resize', () => { if (pick() !== layoutKey) build(pick()); });
