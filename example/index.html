@@ -12,11 +12,11 @@
 :root{
   --bg:#f6f5f2; --surface:#ffffff; --ink:#16181c; --muted:#5d636d; --line:#e2e0db;
   --brand:#e8491d; --brand-ink:#ffffff; --dark:#15171b; --dark-2:#1f2227;
+  --road:96px; --car-w:30px; --car-h:56px; --asphalt:#2b2e33;
   --radius:12px; --shadow:0 10px 30px rgba(0,0,0,.08);
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,sans-serif}
+body{margin:0;position:relative;padding-left:var(--road);background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,sans-serif}
 img{max-width:100%;display:block}
 a{color:inherit}
 h1,h2,h3{font-family:Oswald,Impact,sans-serif;letter-spacing:.02em;line-height:1.15;margin:0 0 .5em;text-transform:uppercase}
@@ -162,12 +162,47 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .reveal{opacity:0;transform:translateY(24px);transition:opacity .6s,transform .6s}
 .reveal.in{opacity:1;transform:none}
 
+/* ---------- the road: runs the full height of the page, the car drives it ---------- */
+.road{position:absolute;top:0;bottom:0;left:0;width:var(--road);z-index:40;overflow:hidden;
+  background:
+    linear-gradient(90deg,#8a8f96 0 3px,transparent 3px calc(100% - 3px),#8a8f96 calc(100% - 3px)),
+    linear-gradient(90deg,transparent 7px,#e9e9e4 7px 9px,transparent 9px calc(100% - 9px),#e9e9e4 calc(100% - 9px) calc(100% - 7px),transparent calc(100% - 7px)),
+    var(--asphalt)}
+.road::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:3px;margin-left:-1.5px;
+  background:repeating-linear-gradient(180deg,#f2c230 0 26px,transparent 26px 50px)}
+.road::after{content:"";position:absolute;left:0;right:0;bottom:0;height:28px;
+  background:repeating-conic-gradient(#fff 0 25%,#111 0 50%) 0 0/14px 14px}
+.sign{position:absolute;left:4px;right:4px;z-index:4;background:#1f7a3a;color:#fff;border:2px solid #fff;border-radius:6px;
+  font:600 .68rem/1.1 Oswald,sans-serif;text-transform:uppercase;letter-spacing:.06em;text-align:center;padding:5px 2px;
+  cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,.35);transition:background .2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sign:hover{background:#26924a}
+.sign.hit{animation:hit .9s ease}
+@keyframes hit{0%,100%{transform:scale(1)}30%{transform:scale(1.12);background:var(--brand)}}
+.paint{position:absolute;left:25%;writing-mode:vertical-rl;transform:translateX(-50%) rotate(180deg);color:rgba(255,255,255,.5);
+  font:700 1.1rem/1 Oswald,sans-serif;letter-spacing:.3em;text-transform:uppercase;pointer-events:none;user-select:none;white-space:nowrap}
+.stopline{position:absolute;left:9px;right:9px;height:5px;background:#e9e9e4;opacity:.8}
+.car{position:absolute;left:0;top:0;width:var(--car-w);height:var(--car-h);margin:calc(var(--car-h) / -2) 0 0 calc(var(--car-w) / -2);
+  will-change:transform;z-index:3;pointer-events:none;filter:drop-shadow(0 4px 3px rgba(0,0,0,.5))}
+.car svg{width:100%;height:100%;display:block;position:relative}
+.beam{position:absolute;left:-40%;right:-40%;bottom:92%;height:180%;opacity:0;transition:opacity .25s;
+  background:linear-gradient(0deg,rgba(255,244,190,.55),rgba(255,244,190,0));clip-path:polygon(30% 100%,70% 100%,100% 0,0 0)}
+.car.lit .beam{opacity:1}
+.car .tail{fill:#6d1010;transition:fill .15s}
+.car.braking .tail{fill:#ff2a2a}
+.puff{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:rgba(220,220,220,.55);
+  pointer-events:none;animation:puff .7s ease-out forwards;z-index:2}
+@keyframes puff{to{transform:scale(2.6);opacity:0}}
+nav a.active{opacity:1;color:var(--brand)}
+
 @media (max-width:900px){
   .services .grid,.pricing .grid,.reviews .grid{grid-template-columns:1fr 1fr}
   .steps{grid-template-columns:1fr 1fr}
   .about .wrap,.faq .wrap,.contact .wrap{grid-template-columns:1fr;gap:36px}
 }
 @media (max-width:720px){
+  :root{--road:52px;--car-w:20px;--car-h:37px}
+  .sign{font-size:.5rem;letter-spacing:0;padding:4px 1px;left:2px;right:2px}
+  .paint{font-size:.8rem}
   section{padding:56px 0}
   .menu-btn{display:block}
   nav ul{position:absolute;top:68px;left:0;right:0;background:var(--dark);flex-direction:column;gap:0;padding:8px 16px 16px;display:none}
@@ -181,11 +216,28 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 }
 @media (prefers-reduced-motion:reduce){
   .slides,.reveal{transition:none}
-  html{scroll-behavior:auto}
 }
 </style>
 </head>
 <body>
+
+<div class="road" id="road" aria-hidden="true">
+  <div class="car" id="car">
+    <div class="beam"></div>
+    <svg viewBox="0 0 30 56">
+      <rect x="0" y="9" width="5" height="11" rx="2" fill="#111"/><rect x="25" y="9" width="5" height="11" rx="2" fill="#111"/>
+      <rect x="0" y="37" width="5" height="11" rx="2" fill="#111"/><rect x="25" y="37" width="5" height="11" rx="2" fill="#111"/>
+      <rect x="2.5" y="1.5" width="25" height="53" rx="9" fill="#e8491d" stroke="#9e2d0c" stroke-width="1"/>
+      <rect x="13" y="1.5" width="4" height="52" fill="#fff" opacity=".85"/>
+      <path d="M6 18 Q15 13 24 18 L23 25 H7 Z" fill="#1d2a38"/>
+      <rect x="7" y="26" width="16" height="12" rx="2" fill="#c63a12"/>
+      <rect x="13" y="26" width="4" height="12" fill="#fff" opacity=".7"/>
+      <path d="M7 39 H23 L22 45 Q15 47 8 45 Z" fill="#1d2a38"/>
+      <rect x="5" y="3" width="6" height="3" rx="1.5" fill="#fff6c8"/><rect x="19" y="3" width="6" height="3" rx="1.5" fill="#fff6c8"/>
+      <rect class="tail" x="5" y="51" width="6" height="2.5" rx="1"/><rect class="tail" x="19" y="51" width="6" height="2.5" rx="1"/>
+    </svg>
+  </div>
+</div>
 
 <div class="topbar">
   <div class="wrap">
@@ -298,7 +350,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 </section>
 
 <!-- ============ PROCESS ============ -->
-<section style="padding-top:0">
+<section id="process" style="padding-top:0">
   <div class="wrap">
     <div class="eyebrow">How it works</div>
     <h2>Four steps, zero surprises</h2>
@@ -325,7 +377,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 </section>
 
 <!-- ============ FAQ ============ -->
-<section class="faq">
+<section class="faq" id="faq">
   <div class="wrap">
     <div>
       <div class="eyebrow">FAQ</div>
@@ -544,6 +596,116 @@ document.getElementById('again').onclick = e => {
   [...form.children].forEach(c => c.hidden = false);
   document.getElementById('sent').classList.remove('show');
 };
+
+// ---------- the road: a car drives to whatever section you click, the page follows it ----------
+(() => {
+  const road = document.getElementById('road'), car = document.getElementById('car');
+  const header = document.querySelector('header.nav');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const STOP = 70;                                   // car parks this far into a section
+  const LABEL = {top:'Start', services:'Services', about:'About', pricing:'Pricing', process:'How it works', reviews:'Reviews', faq:'FAQ', contact:'Contact'};
+  const hdr = () => header.offsetHeight;
+  const docTop = el => el.getBoundingClientRect().top + scrollY;
+  const stops = [...document.querySelectorAll('section[id]')].map(sec => {
+    const id = sec.id, name = LABEL[id] || id;
+    const sign = document.createElement('div');
+    sign.className = 'sign'; sign.textContent = name; sign.title = 'Drive to ' + name;
+    sign.onclick = () => driveTo(id);
+    const line = document.createElement('div'); line.className = 'stopline';
+    const paint = document.createElement('div'); paint.className = 'paint'; paint.textContent = name;
+    road.append(sign, line, paint);
+    const s = {id, sec, sign, line, paint, y:0};
+    s.park = () => id === 'top' ? hdr() + STOP + 60 : s.y + STOP;
+    return s;
+  });
+  function layout(){
+    stops.forEach(s => {
+      s.y = docTop(s.sec);
+      s.sign.style.top = (s.id === 'top' ? hdr() + 10 : s.y + 8) + 'px';
+      s.line.style.top = (s.park() + car.offsetHeight / 2 + 6) + 'px';
+      s.paint.style.top = (s.park() + car.offsetHeight / 2 + 30) + 'px';
+    });
+  }
+  new ResizeObserver(layout).observe(document.body);
+  addEventListener('load', layout);
+  layout();
+
+  const W = () => road.offsetWidth, maxScroll = () => document.documentElement.scrollHeight - innerHeight;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  let carY = scrollY + stops[0].park(), carX = W() * .75, ang = 180, dir = 1;
+  let offset = carY - scrollY, drive = null, last = performance.now(), prevV = 0, lastPuff = 0;
+  const navLinks = [...document.querySelectorAll('nav a')];
+
+  function driveTo(id){
+    const s = stops.find(s => s.id === id); if (!s) return;
+    const to = s.park(), camTo = id === 'top' ? 0 : clamp(to - (hdr() + STOP), 0, maxScroll());
+    history.replaceState(null, '', id === 'top' ? location.pathname + location.search : '#' + id);
+    if (reduce){ carY = to; scrollTo(0, camTo); offset = carY - camTo; return; }
+    const dist = Math.abs(to - carY);
+    drive = {s, from:carY, to, camTo, cam:scrollY, off:to - camTo, t0:performance.now(), dur:clamp(500 + dist * .45, 700, 2600)};
+  }
+  // every in-page link goes by road
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#"]'); if (!a) return;
+    const id = a.getAttribute('href').slice(1);
+    if (stops.some(s => s.id === id)){ e.preventDefault(); driveTo(id); }
+  });
+  // the user taking the wheel (scrolling themselves) cancels a drive
+  const cancel = () => { if (drive){ drive = null; offset = clamp(carY - scrollY, 90, innerHeight - 60); } };
+  ['wheel','touchstart'].forEach(ev => addEventListener(ev, cancel, {passive:true}));
+  addEventListener('keydown', e => { if (/Arrow|Page|Home|End|Space/.test(e.code) && !e.target.closest('input,textarea,select')) cancel(); });
+
+  const ease = k => k < .5 ? 4*k*k*k : 1 - Math.pow(-2*k + 2, 3) / 2;
+  function puff(){
+    const p = document.createElement('div'); p.className = 'puff';
+    p.style.left = carX + 'px'; p.style.top = (carY - dir * car.offsetHeight * .55) + 'px';
+    road.appendChild(p); setTimeout(() => p.remove(), 700);
+  }
+  function frame(now){
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    const y0 = carY;
+    if (drive){
+      const k = Math.min(1, (now - drive.t0) / drive.dur);
+      carY = drive.from + (drive.to - drive.from) * ease(k);
+      // the camera trails the car, but never lets it leave the screen
+      let cam = drive.cam + (carY - drive.off - drive.cam) * (1 - Math.exp(-dt * 5));
+      cam = clamp(cam, carY - innerHeight + 90, carY - 90);
+      if (k === 1) cam += (drive.camTo - cam) * (1 - Math.exp(-dt * 8));
+      drive.cam = clamp(cam, 0, maxScroll());
+      scrollTo(0, drive.cam);
+      if (k === 1 && Math.abs(drive.cam - drive.camTo) < 1){
+        scrollTo(0, drive.camTo);
+        offset = carY - drive.camTo;
+        const sign = drive.s.sign;
+        sign.classList.remove('hit'); void sign.offsetWidth; sign.classList.add('hit');
+        drive = null;
+      }
+    } else {
+      // free scrolling: the car cruises along, holding its spot on screen
+      const target = clamp(scrollY + offset, hdr() + 40, document.body.scrollHeight - 50);
+      carY += (target - carY) * (1 - Math.exp(-dt * 9));
+    }
+    const v = (carY - y0) / Math.max(dt, 1e-3), speed = Math.abs(v);
+    if (speed > 25) dir = Math.sign(v);
+    // keep left: heading down the page, the car's left is the screen's right
+    const lane = W() * (dir > 0 ? .75 : .25);
+    carX += (lane - carX) * (1 - Math.exp(-dt * 6));
+    ang += ((dir > 0 ? 180 : 0) - ang) * (1 - Math.exp(-dt * 8));
+    const steer = clamp((lane - carX) * .6, -25, 25) * (dir > 0 ? -1 : 1);
+    car.style.transform = `translate(${carX}px,${carY}px) rotate(${ang + steer}deg)`;
+    car.classList.toggle('lit', speed > 60);
+    car.classList.toggle('braking', speed + 40 < Math.abs(prevV) || !!(drive && now - drive.t0 > drive.dur * .6));
+    if (drive && speed > 200 && now - lastPuff > 70 && now - drive.t0 < drive.dur * .5){ puff(); lastPuff = now; }
+    prevV = v;
+    // light up the nav link for the section the car is in
+    let here = stops[0];
+    stops.forEach(s => { if (carY >= s.y - 10) here = s; });
+    navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + here.id));
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+  if (location.hash) setTimeout(() => driveTo(location.hash.slice(1)), 400);
+})();
 
 document.getElementById('yr').textContent = new Date().getFullYear();
 </script>
